@@ -43,7 +43,15 @@ export async function engineFetch(
   headers.set('Authorization', `Bearer ${token}`);
   const response = await fetch(`${baseUrl}${path}`, { ...init, headers, cache: 'no-store' });
   if (!response.ok) {
-    throw new EngineHttpError(response.status, `${init.method ?? 'GET'} ${path} failed with ${response.status}`);
+    // The engine explains refusals in `detail`; show that rather than a status code.
+    let detail: string | undefined;
+    try {
+      const body = (await response.json()) as { detail?: unknown };
+      if (typeof body.detail === 'string') detail = body.detail;
+    } catch {
+      // not JSON
+    }
+    throw new EngineHttpError(response.status, detail ?? `${init.method ?? 'GET'} ${path} failed with ${response.status}`);
   }
   return response;
 }

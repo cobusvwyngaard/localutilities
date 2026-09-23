@@ -89,7 +89,7 @@ Routing rule in the UI:
 
 ### 3.3 Files
 
-- Browser → engine upload (`multipart`) for ordinary files. Over loopback this is fast, but it temporarily doubles disk use.
+- Browser → engine upload for ordinary files: the file is the raw request body (`POST /api/files?name=…`), streamed straight to disk — no multipart parsing or in-memory buffering. Over loopback this is fast, but it temporarily doubles disk use.
 - **Folder mode** for big files: the engine exposes a configurable *Inbox* and *Outbox* (e.g. `~/Werkbank/Inbox`, `~/Werkbank/Outbox`). The UI lists Inbox files; outputs always land in Outbox and are also downloadable.
 - Temp work directory per job, deleted on completion; a startup sweep removes anything older than 24 h.
 - Output naming: `<original stem> (<tool>).<ext>`, never overwriting — append ` (2)`, ` (3)`.
@@ -100,13 +100,13 @@ Phase numbers refer to §9. **E** = engine (native), **B** = browser.
 
 ### 4.1 Requested
 
-| Tool | E | B | Phase |
-|---|---|---|---|
-| Media downloader (YouTube and other yt-dlp sites) | ✅ | ❌ | 1 |
-| Video compression | ✅ | ✅ (Mediabunny) | 1 / 2 |
-| Audio compression | ✅ | ✅ | 1 / 2 |
-| Audio/video format conversion | ✅ | ✅ | 1 / 2 |
-| PDF password / restriction removal | ✅ (pikepdf) | ✅ (qpdf-wasm) | 1 / 2 |
+| Tool | E | B | Phase | Built (registry id) |
+|---|---|---|---|---|
+| Media downloader (YouTube and other yt-dlp sites) | ✅ | ❌ | 1 | Engine: `download.media` |
+| Video compression | ✅ | ✅ (Mediabunny) | 1 / 2 | Engine: `video.compress` |
+| Audio compression | ✅ | ✅ | 1 / 2 | Engine: `audio.compress` |
+| Audio/video format conversion | ✅ | ✅ | 1 / 2 | Engine: `video.convert`, `audio.convert` |
+| PDF password / restriction removal | ✅ (pikepdf) | ✅ (qpdf-wasm) | 1 / 2 | Engine: `pdf.unlock` |
 
 ### 4.2 Recommended additions — media
 
@@ -179,8 +179,10 @@ Phase numbers refer to §9. **E** = engine (native), **B** = browser.
 - SponsorBlock removal (`--sponsorblock-remove sponsor`).
 - "Info" button: `yt-dlp -J` to show title, duration, available formats before downloading.
 
+**As built (phase 1):** the format filters use `height<=?N` instead of `height<=N`, so formats whose height is unknown are not rejected; yt-dlp runs as `python -m yt_dlp` from the engine's environment with `--js-runtimes deno:<path>` and `--ffmpeg-location <path>` (a PATH inherited before a winget install may miss both), `--ignore-config`, `--no-mtime`, and the URL after `--`. Not built yet: the "Info" button and the cookies option.
+
 **Maintenance:**
-- Engine checks the installed yt-dlp version at start-up; if older than 30 days, it offers a one-click update (`uv pip install -U "yt-dlp[default]"` in the engine's virtual environment).
+- Engine checks the installed yt-dlp version at start-up; if older than 30 days, it offers a one-click update (`uv pip install -U "yt-dlp[default]"` in the engine's virtual environment). *As built:* the health page shows the release age and an **Update yt-dlp** button (`POST /api/admin/update-ytdlp`); the installer also updates it after syncing from the lockfile; the start scripts use `uv run --no-sync`, because a sync would downgrade yt-dlp to the locked version.
 - Health check verifies `deno --version`; if missing, the downloader shows a clear fix-it message.
 - Age-restricted/members-only videos need `--cookies-from-browser`. On Windows, cookie extraction from Chromium browsers is unreliable because of Chrome's app-bound cookie encryption; Firefox is the more dependable source. Using account cookies carries some risk of the account being flagged — keep this an explicit, off-by-default option.
 
@@ -245,13 +247,15 @@ Using the Python library (rather than the `qpdf` CLI) keeps the password out of 
 
 | Method & path | Purpose |
 |---|---|
-| `GET /api/health` | Engine version; each dependency's version and availability; hardware encoders; free disk space |
-| `POST /api/files` | Upload → `{fileId}` |
-| `GET /api/inbox` | List Inbox files |
-| `POST /api/jobs` | `{tool, params, inputs: [fileId \| inboxPath \| url]}` → `{jobId}` |
-| `GET /api/jobs/{id}/events` | SSE stream: `progress`, `log`, `done`, `error` |
-| `GET /api/jobs/{id}/result` | Download output (zip if several) |
-| `DELETE /api/jobs/{id}` | Cancel |
+| `GET /api/health` | Engine version; each dependency's version and availability; hardware encoders (tested by a short encode, in the background); free disk space |
+| `POST /api/files?name=…` | Upload (raw body) → `{fileId, name, size}` |
+| `GET /api/inbox` | List Inbox files (Inbox-relative names) |
+| `POST /api/jobs` | `{tool, params, inputs: [{fileId} \| {inbox} \| {url}]}` → job snapshot |
+| `GET /api/jobs`, `GET /api/jobs/{id}` | Job snapshots (never include parameters, so never a password) |
+| `GET /api/jobs/{id}/events` | SSE stream of job snapshots until the job finishes (read with `fetch`, so the token can be sent) |
+| `GET /api/jobs/{id}/outputs/{n}` | Download one output (each output is a separate file in the Outbox; no zip) |
+| `POST /api/jobs/{id}/outputs/{n}/reveal` | Show the output in Explorer / Finder |
+| `DELETE /api/jobs/{id}` | Cancel (kills the process tree; nothing is written to the Outbox) |
 | `POST /api/admin/update-ytdlp` | Update yt-dlp in the venv |
 
 ### 6.2 Security (the engine can run programs, so this matters)
@@ -342,6 +346,7 @@ werkbank/
 - Downloader, video/audio compression presets (incl. target size and hardware toggle), conversion with remux-first, PDF unlock.
 - Job queue with SSE progress and cancel.
 - ✅ Accept when: a 1 h lecture video compresses with live progress and can be cancelled cleanly; a YouTube video downloads as MP4 and as M4A; an owner-restricted PDF is unlocked without a password and a user-password PDF unlocks only with the correct one.
+- *Status (23 Sept 2026): built. Verified in CI through the real UI and engine: live progress over SSE and a clean cancel (40-second clip, not 1 h), remux-first conversion, target-size compression within the target, PDF unlock of both kinds (the password is never echoed back), and yt-dlp downloading from a web server; the engine test suite also runs on Windows. **Not yet verified: YouTube** — YouTube refuses cloud/CI addresses ("Sign in to confirm you're not a bot"), so the MP4/M4A download must be confirmed on the owner's laptop.*
 
 **Phase 2 — Browser path and first additions**
 - Mediabunny compression/conversion, qpdf-wasm unlock, pdf-lib page tools, image tools, QR codes, metadata stripping, loudness normalisation, trim/extract audio, Ghostscript compression.

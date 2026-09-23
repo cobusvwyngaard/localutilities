@@ -54,6 +54,11 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: pipx install "uv==${UV_VERSION}"
+      - name: Install FFmpeg and Deno (the tool tests run the real programs)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          npm install -g "deno@${DENO_VERSION}"
       - run: uv sync --frozen
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -87,7 +92,7 @@ jobs:
           retention-days: 7
 
   windows-installer:
-    name: Windows installer (install.ps1, start.cmd, health)
+    name: Windows (install.ps1, start.cmd, health, engine tests)
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -153,6 +158,16 @@ jobs:
             if ([int]$_.Exception.Response.StatusCode -ne 401) { throw }
           }
           'Windows install and engine health: OK'
+      - name: Engine test suite on Windows (real FFmpeg, process-tree kill, Windows paths)
+        shell: powershell
+        working-directory: engine
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $env:Path = "$env:LOCALAPPDATA\Microsoft\WinGet\Links;$env:USERPROFILE\.local\bin;$env:Path"
+          uv sync --frozen
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          uv run --frozen pytest -q
+          exit $LASTEXITCODE
 
   deploy:
     name: Deploy to Cloudflare

@@ -21,40 +21,45 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import uvicorn
-from fastapi import APIRouter, Depends, FastAPI, Query, Request
+from fastapi import FastAPI
 
 from werkbank_engine import __version__
 from werkbank_engine.config import ConfigError, Settings, load_settings
-from werkbank_engine.health import HealthReport, HealthService
+from werkbank_engine.files import FileStore, sweep
+from werkbank_engine.health import HealthService
+from werkbank_engine.jobs import JobManager
 from werkbank_engine.registry import RegistryError, load_registry
-from werkbank_engine.security import LoopbackGuardMiddleware, require_api_access
+from werkbank_engine.routes import api, update_ytdlp
+from werkbank_engine.security import LoopbackGuardMiddleware
+from werkbank_engine.tools import IMPLEMENTATIONS
 from werkbank_engine.webui import mount_web_ui
 
 BIND_HOST = "127.0.0.1"  # never 0.0.0.0 (DESIGN.md §6)
 
-# Every route on this router gets the shared security dependency.
-api = APIRouter(prefix="/api", dependencies=[Depends(require_api_access)])
-
-
-@api.get("/health", response_model=HealthReport, response_model_by_alias=True)
-async def health(request: Request, refresh: bool = Query(default=False)) -> HealthReport:
-    service: HealthService = request.app.state.health
-    return await service.report(refresh=refresh)
+__all__ = ["api", "create_app", "main"]
 
 
 def create_app(settings: Settings | None = None, health_service: HealthService | None = None) -> FastAPI:
     settings = settings or load_settings()
     registry = load_registry(settings.registry_path)
+    missing = [t.id for t in registry.tools if "engine" in t.runsIn and t.id not in IMPLEMENTATIONS]
+    if missing:
+        raise RegistryError(f"registry tools without an engine implementation: {', '.join(missing)}")
     health_service = health_service or HealthService(settings, tool_count=len(registry.tools))
+    files = FileStore(settings.work_dir / "uploads")
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        for folder in (settings.inbox, settings.outbox):
+        for folder in (settings.inbox, settings.outbox, files.root, settings.work_dir / "jobs"):
             folder.mkdir(parents=True, exist_ok=True)
+        for folder in (files.root, settings.work_dir / "jobs"):  # DESIGN.md §3.3: 24-hour sweep
+            await asyncio.to_thread(sweep, folder)
+        app.state.jobs = JobManager(settings, registry, health_service, files, IMPLEMENTATIONS)
         warmup = asyncio.create_task(health_service.refresh())  # probe dependencies in the background
         try:
             yield
         finally:
+            await app.state.jobs.shutdown()
             warmup.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await warmup
@@ -71,6 +76,7 @@ def create_app(settings: Settings | None = None, health_service: HealthService |
     app.state.settings = settings
     app.state.registry = registry
     app.state.health = health_service
+    app.state.files = files
     app.include_router(api)
     mount_web_ui(app, settings)
     app.add_middleware(LoopbackGuardMiddleware, settings=settings)
@@ -122,7 +128,15 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="werkbank-engine", description="Werkbank local engine")
     parser.add_argument("--open", action="store_true", help="open the UI in the browser once ready")
     parser.add_argument("--port", type=int, help="override the port from the config file")
+    parser.add_argument(
+        "--update-ytdlp", action="store_true", help="update yt-dlp to its latest release and exit"
+    )
     args = parser.parse_args(argv)
+
+    if args.update_ytdlp:
+        ok, output = asyncio.run(update_ytdlp())
+        print(output)
+        return 0 if ok else 1
 
     try:
         settings = load_settings(port_override=args.port)

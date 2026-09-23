@@ -56,7 +56,30 @@ function FixCommand({ command }: { command: string }) {
   );
 }
 
-function DependencyRow({ dep }: { dep: DependencyStatus }) {
+function UpdateButton({ onUpdate }: { onUpdate: () => Promise<string | null> }) {
+  const [state, setState] = useState<{ busy: boolean; message: string | null }>({ busy: false, message: null });
+  return (
+    <span className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        disabled={state.busy}
+        className="rounded border border-zinc-300 px-1.5 text-xs hover:bg-zinc-100 disabled:opacity-50 dark:border-zinc-700 dark:hover:bg-zinc-800"
+        onClick={() => {
+          setState({ busy: true, message: null });
+          onUpdate().then(
+            (version) => setState({ busy: false, message: version ? `Now ${version}` : 'Updated' }),
+            (e: unknown) => setState({ busy: false, message: e instanceof Error ? e.message : String(e) }),
+          );
+        }}
+      >
+        {state.busy ? 'Updating…' : 'Update yt-dlp'}
+      </button>
+      {state.message && <span className="text-xs">{state.message}</span>}
+    </span>
+  );
+}
+
+function DependencyRow({ dep, onUpdateYtdlp }: { dep: DependencyStatus; onUpdateYtdlp?: () => Promise<string | null> }) {
   return (
     <li
       data-testid={`dep-${dep.id}`}
@@ -80,12 +103,21 @@ function DependencyRow({ dep }: { dep: DependencyStatus }) {
       <div className="space-y-1 text-zinc-600 dark:text-zinc-400">
         <div>{dep.neededFor}</div>
         {!dep.available && dep.fix ? <FixCommand command={dep.fix} /> : null}
+        {dep.id === 'yt-dlp' && dep.available && onUpdateYtdlp ? <UpdateButton onUpdate={onUpdateYtdlp} /> : null}
       </div>
     </li>
   );
 }
 
-function EngineDetails({ health, onRecheck }: { health: HealthReport; onRecheck: () => Promise<void> }) {
+function EngineDetails({
+  health,
+  onRecheck,
+  onUpdateYtdlp,
+}: {
+  health: HealthReport;
+  onRecheck: () => Promise<void>;
+  onUpdateYtdlp?: () => Promise<string | null>;
+}) {
   const [busy, setBusy] = useState(false);
   const { listed, usable, checking } = health.hardwareEncoders;
   return (
@@ -109,7 +141,7 @@ function EngineDetails({ health, onRecheck }: { health: HealthReport; onRecheck:
         </div>
         <ul className="mt-3">
           {health.dependencies.map((d) => (
-            <DependencyRow key={d.id} dep={d} />
+            <DependencyRow key={d.id} dep={d} onUpdateYtdlp={onUpdateYtdlp} />
           ))}
         </ul>
       </section>
@@ -159,14 +191,24 @@ function EngineDetails({ health, onRecheck }: { health: HealthReport; onRecheck:
   );
 }
 
-export function StatusPage({ state, onRecheck }: { state: EngineState; onRecheck: () => Promise<void> }) {
+export function StatusPage({
+  state,
+  onRecheck,
+  onUpdateYtdlp,
+}: {
+  state: EngineState;
+  onRecheck: () => Promise<void>;
+  onUpdateYtdlp?: () => Promise<string | null>;
+}) {
   return (
     <section aria-labelledby="status-title" className="space-y-4">
       <h1 id="status-title" className="text-2xl font-semibold">
         Status
       </h1>
       <ModeCard state={state} />
-      {state.kind === 'connected' && <EngineDetails health={state.health} onRecheck={onRecheck} />}
+      {state.kind === 'connected' && (
+        <EngineDetails health={state.health} onRecheck={onRecheck} onUpdateYtdlp={onUpdateYtdlp} />
+      )}
     </section>
   );
 }

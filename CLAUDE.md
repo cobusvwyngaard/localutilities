@@ -29,6 +29,8 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 - Lint/types: `npm run lint`, `npm run typecheck`, `cd engine && uv run ruff check . && uv run ruff format --check .`
 - Build UI for engine to serve: `npm run build -w apps/web`
 - Windows scripts (`scripts/*.ps1`, `*.cmd`) must stay ASCII-only and Windows PowerShell 5.1 compatible.
+- The start scripts run `uv run --no-sync` (a sync would undo an in-app yt-dlp update); the installers sync from the lockfile and then update yt-dlp. After adding an engine dependency, users must re-run the installer.
+- Engine tool modules: `engine/werkbank_engine/tools/<id with dots as underscores>.py` with `HEAVY` and `async def run(ctx)`, registered in `tools/__init__.py`; the engine refuses to start if a registry tool has no implementation.
 
 ## When adding a tool
 1. Registry entry with params, `runsIn`, `browserLimitBytes`.
@@ -38,6 +40,8 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 5. Update the feature table in `DESIGN.md`.
 
 ## External dependency facts (verified Sept 2026 — re-check if something breaks)
+- YouTube refuses cloud and CI addresses ("Sign in to confirm you're not a bot"): YouTube downloads can only be tested on a home connection.
+- Ghostscript is not in winget (removed Sept 2025).
 - yt-dlp needs Deno (or another supported JS runtime) plus `yt-dlp-ejs` for YouTube; keep yt-dlp current.
 - Cloudflare static hosting (Workers Static Assets): 25 MiB per-file limit — load the ffmpeg.wasm core from a pinned CDN URL with SRI or from R2.
 - Deployment: `.github/workflows/ci.yml` deploys `main` with `npx wrangler deploy` after all checks pass (secret `CLOUDFLARE_API_TOKEN`). Never deploy from any other branch.

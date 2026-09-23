@@ -4,4 +4,5 @@ set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 export PATH="$HOME/.local/bin:$HOME/.deno/bin:$PATH"
 command -v uv >/dev/null 2>&1 || { echo "uv was not found. Run scripts/install.sh first." >&2; exit 1; }
-exec uv run --project engine --frozen --no-dev werkbank-engine --open "$@"
+# --no-sync: the installer syncs the environment; syncing here would undo a yt-dlp update.
+exec uv run --project engine --no-sync werkbank-engine --open "$@"

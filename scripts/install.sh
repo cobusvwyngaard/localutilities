@@ -64,6 +64,9 @@ cd "$repo_root"
 step "Setting up the engine (Python environment)"
 uv sync --project engine --frozen --no-dev
 
+step "Updating yt-dlp to its latest release (sites change often)"
+uv run --project engine --no-sync werkbank-engine --update-ytdlp
+
 step "Installing UI packages (npm ci)"
 npm ci --no-audit --no-fund
 

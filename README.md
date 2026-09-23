@@ -11,8 +11,10 @@ Two ways to use the same UI:
 | **Mode A — local** (primary) | The engine on your laptop, `http://127.0.0.1:8765` | Native tools (FFmpeg, yt-dlp, pikepdf, …) |
 | **Mode B — hosted** | https://localutilities.cobus-w.workers.dev | Inside the browser only |
 
-Status: **Phase 0** (skeleton) — the engine, security checks, health page and deployment work; the
-tool registry is still empty. Tools arrive from Phase 1 (DESIGN.md §9).
+Status: **Phase 1** — on the engine (Mode A): download video/audio (yt-dlp), compress video and audio,
+convert video and audio (without re-encoding when possible) and unlock PDFs, with live progress, cancel,
+drag-and-drop, the Inbox/Outbox folders and a jobs list. The hosted site (Mode B) shows the tools but
+they need the engine until the browser versions arrive in Phase 2 (DESIGN.md §9).
 
 ## Install on Windows (Mode A)
 
@@ -32,7 +34,10 @@ puts a **Werkbank** shortcut on the desktop and starts Werkbank. Your browser op
 command to fix a missing dependency.
 
 - **Start:** the desktop shortcut (or `scripts\start.cmd`). Closing the engine window stops it.
-- **Update:** `git pull`, then run `scripts\install.ps1` again.
+- **Update:** `git pull`, then run `scripts\install.ps1` again. yt-dlp can also be updated on its own
+  from the Status page (sites such as YouTube change often).
+- **Results** are saved in the Outbox (never overwriting: ` (2)`, ` (3)` are added); big files can be
+  put in the Inbox instead of being added through the browser.
 - **Files and settings:** Inbox/Outbox in `%USERPROFILE%\Werkbank`; the engine's config (including
   its access token) in `%APPDATA%\Werkbank\config.json`.
 

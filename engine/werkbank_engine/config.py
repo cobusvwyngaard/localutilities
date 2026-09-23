@@ -11,6 +11,7 @@ import os
 import re
 import secrets
 import sys
+import tempfile
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -40,6 +41,7 @@ class Settings:
     hosted_origins: tuple[str, ...]
     web_dist: Path
     registry_path: Path
+    work_dir: Path  # uploads and per-job scratch folders (on the local disk, swept after 24 h)
 
     @property
     def config_file(self) -> Path:
@@ -144,4 +146,5 @@ def load_settings(env: Mapping[str, str] = os.environ, port_override: int | None
         registry_path=Path(
             env.get("WERKBANK_REGISTRY") or REPO_ROOT / "packages" / "shared" / "dist" / "tools.json"
         ),
+        work_dir=Path(env.get("WERKBANK_WORK") or Path(tempfile.gettempdir()) / "werkbank"),
     )

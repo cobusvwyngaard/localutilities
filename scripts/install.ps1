@@ -5,7 +5,8 @@
 .DESCRIPTION
     1. Installs uv, FFmpeg, Deno and Node.js LTS with winget, skipping any that are already present.
        Each winget package ID is verified with `winget show` before it is used.
-    2. Sets up the engine's Python environment (uv installs Python 3.12 if needed).
+    2. Sets up the engine's Python environment (uv installs Python 3.12 if needed) and updates
+       yt-dlp to its latest release.
     3. Installs the UI's packages and builds the UI that the engine serves.
     4. Creates a "Werkbank" shortcut on the desktop and starts Werkbank.
 
@@ -148,6 +149,9 @@ Push-Location $RepoRoot
 try {
     Write-Step 'Setting up the engine (Python environment)'
     Invoke-Native 'uv sync' { & uv sync --project engine --frozen --no-dev }
+
+    Write-Step 'Updating yt-dlp to its latest release (sites change often)'
+    Invoke-Native 'yt-dlp update' { & uv run --project engine --no-sync werkbank-engine --update-ytdlp }
 
     Write-Step 'Installing UI packages (npm ci)'
     Invoke-Native 'npm ci' { & npm ci --no-audit --no-fund }

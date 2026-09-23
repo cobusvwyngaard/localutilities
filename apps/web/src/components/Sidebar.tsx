@@ -19,7 +19,9 @@ export function Sidebar({ route }: { route: Route }) {
         </li>
         {categories.map((c) => {
           const count = tools.filter((t) => t.category === c.id).length;
-          const active = route.page === 'category' && route.category === c.id;
+          const active =
+            (route.page === 'category' && route.category === c.id) ||
+            (route.page === 'tool' && tools.find((t) => t.id === route.tool)?.category === c.id);
           return (
             <li key={c.id}>
               <a href={hrefFor({ page: 'category', category: c.id })} className={linkClass(active)}>

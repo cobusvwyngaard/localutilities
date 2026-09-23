@@ -12,7 +12,8 @@ set "PATH=%LOCALAPPDATA%\Microsoft\WinGet\Links;%USERPROFILE%\.local\bin;%PATH%"
 where uv >nul 2>nul
 if errorlevel 1 goto no_uv
 
-uv run --project engine --frozen --no-dev werkbank-engine --open %*
+rem --no-sync: the installer syncs the environment; syncing here would undo a yt-dlp update.
+uv run --project engine --no-sync werkbank-engine --open %*
 if errorlevel 1 goto failed
 exit /b 0
 

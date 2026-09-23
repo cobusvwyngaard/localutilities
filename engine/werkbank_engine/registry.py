@@ -55,6 +55,7 @@ class TextParam(_Strict):
     maxLength: int
     default: str | None = None
     placeholder: str | None = None
+    secret: bool = False
 
 
 ParamDef = Annotated[EnumParam | NumberParam | BooleanParam | TextParam, Field(discriminator="type")]
