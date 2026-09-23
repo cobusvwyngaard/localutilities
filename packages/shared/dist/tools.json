@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "categories": [
+    {
+      "id": "download",
+      "title": "Download"
+    },
+    {
+      "id": "video",
+      "title": "Video"
+    },
+    {
+      "id": "audio",
+      "title": "Audio"
+    },
+    {
+      "id": "pdf",
+      "title": "PDF"
+    },
+    {
+      "id": "image",
+      "title": "Images"
+    },
+    {
+      "id": "document",
+      "title": "Documents"
+    },
+    {
+      "id": "text",
+      "title": "Text"
+    }
+  ],
+  "dependencyIds": [
+    "ffmpeg",
+    "ffprobe",
+    "deno",
+    "yt-dlp",
+    "pikepdf",
+    "ghostscript",
+    "tesseract",
+    "libreoffice",
+    "pandoc",
+    "calibre"
+  ],
+  "tools": []
+}

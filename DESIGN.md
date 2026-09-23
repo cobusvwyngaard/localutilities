@@ -1,5 +1,7 @@
 # Werkbank — local-first utilities suite
-*Design document, v0.1 — 23 September 2026. "Werkbank" is a placeholder name.*
+*Design document, v0.2 — 23 September 2026. "Werkbank" is a placeholder name.*
+
+*v0.2: hosting is an assets-only Cloudflare Worker (Workers Static Assets) deployed from GitHub Actions, replacing the Cloudflare Pages Git integration; Node.js added as a laptop dependency (it builds the UI the engine serves).*
 
 ## 1. Summary
 
@@ -10,7 +12,7 @@ The central design decision: **one front-end codebase, two ways of running it.**
 | Mode | Where the UI comes from | Where the work happens | Use it for |
 |---|---|---|---|
 | **A — Local (primary)** | Served by the local engine at `http://127.0.0.1:8765` | Native tools on your laptop (ffmpeg, yt-dlp, pikepdf, …) | Everything, including large files and YouTube |
-| **B — Hosted (portable)** | Cloudflare Pages (`*.pages.dev` or your domain) | Inside the browser (WebAssembly / WebCodecs) | Quick jobs on any device, including phones, with nothing installed |
+| **B — Hosted (portable)** | Cloudflare Workers Static Assets (`localutilities.cobus-w.workers.dev` or your domain) | Inside the browser (WebAssembly / WebCodecs) | Quick jobs on any device, including phones, with nothing installed |
 
 Mode B can *optionally* hand heavy jobs to the local engine, but only in some browsers (see §2). Mode A has none of those restrictions, which is why it is the primary mode.
 
@@ -19,7 +21,7 @@ Mode B can *optionally* hand heavy jobs to the local engine, but only in some br
 These drive the architecture; each has been verified against current documentation.
 
 1. **Cloudflare cannot do the processing.** Free Workers/Pages Functions are limited to 100 000 requests/day and 10 ms CPU per request, with 128 MB memory per isolate. ffmpeg and yt-dlp cannot run there. Cloudflare's role is *static hosting only*.
-2. **25 MiB per-file limit on Cloudflare Pages** (20 000 files per deployment on the free plan). The ffmpeg.wasm core is roughly 30 MB, so it cannot be bundled into the Pages deployment; it must be lazy-loaded from a CDN or from R2 (free tier 10 GB).
+2. **25 MiB per-file limit on Cloudflare static hosting** (Workers Static Assets and Pages alike; 20 000 files per version on the free plan; static asset requests are free and unlimited). The ffmpeg.wasm core is roughly 30 MB, so it cannot be bundled into the deployment; it must be lazy-loaded from a CDN or from R2 (free tier 10 GB).
 3. **YouTube downloading cannot be done in a browser.** It needs yt-dlp running natively. Since yt-dlp 2025.11.12, full YouTube support also requires an external JavaScript runtime — **Deno** is the default and recommended one — plus the `yt-dlp-ejs` component (bundled with the official executables and with `yt-dlp[default]`). yt-dlp versions older than a few months frequently break against YouTube, so the engine must keep it updated.
 4. **A hosted HTTPS page talking to `http://127.0.0.1` is browser-dependent:**
    - **Chrome/Edge 142+**: allowed, but gated behind a *Local Network Access* permission prompt (from Chrome 145 this is the separate `loopback-network` permission). If the user blocks it, the fetch fails.
@@ -36,7 +38,7 @@ flowchart LR
   subgraph GitHub
     R[(Monorepo)]
   end
-  R -- push to main --> CF[Cloudflare Pages<br/>static build of apps/web]
+  R -- push to main: GitHub Actions tests, builds, wrangler deploy --> CF[Cloudflare Workers Static Assets<br/>static build of apps/web]
   R -- git pull / install script --> E
 
   subgraph Laptop
@@ -270,6 +272,7 @@ Installed by `scripts/install.ps1` with **winget** — the script must verify ea
 | Dependency | Needed for | Required? |
 |---|---|---|
 | uv | Python environment | Yes |
+| Node.js (LTS, ≥ 22) | Building the UI that the engine serves (`npm run build -w apps/web`) | Yes |
 | FFmpeg (full build, e.g. Gyan's) | All media | Yes |
 | Deno | yt-dlp YouTube support | Yes, for downloader |
 | Ghostscript | PDF compression | Phase 2 |
@@ -284,7 +287,7 @@ Python packages (`engine/pyproject.toml`): `fastapi`, `uvicorn`, `yt-dlp[default
 
 ### 6.4 Starting the engine
 
-- Phase 1: `Start Werkbank.cmd` → starts the engine and opens `http://127.0.0.1:8765`.
+- Phase 0/1: `scripts\start.cmd` (the installer puts a **Werkbank** shortcut to it on the desktop) → starts the engine and opens `http://127.0.0.1:8765`; if the engine is already running it only opens the browser.
 - Later: a system-tray icon (pystray) with Start/Stop/Open/Update, optionally started at login.
 
 ## 7. Front end
@@ -311,17 +314,19 @@ werkbank/
 ├─ engine/
 │  ├─ pyproject.toml
 │  └─ werkbank_engine/{main.py,jobs.py,security.py,tools/…}
-├─ scripts/{install.ps1,install.sh,start.cmd}
-└─ .github/workflows/ci.yml  # lint + tests for web and engine
+├─ scripts/{install.ps1,install.sh,start.cmd,start.sh}
+├─ wrangler.jsonc            # Cloudflare Workers Static Assets config
+└─ .github/workflows/ci.yml  # lint + tests for web and engine; deploys main when green
 ```
 
 - The tool registry is authored once in TypeScript and exported to `packages/shared/dist/tools.json`, which the engine reads — one source of truth.
 - **Never commit binaries** (ffmpeg, wasm cores, models). They come from package managers or CDNs.
-- **GitHub:** a private repository is fine; Cloudflare Pages deploys from private repos.
-- **Cloudflare Pages:** connect the repo; build command `npm run build -w apps/web`; output `apps/web/dist`. Static requests are unlimited on the free plan. (Cloudflare's newer documentation increasingly points to *Workers Static Assets* instead of Pages; for a purely static site either works, with the same file limits.)
+- **GitHub:** public or private both work; deployment runs from GitHub Actions, so Cloudflare needs no access to the repository.
+- **Cloudflare hosting:** an assets-only Worker (*Workers Static Assets*, no Worker script) configured in `wrangler.jsonc`, serving `apps/web/dist` with single-page-application fallback. Static asset requests are free and unlimited.
+- **Deployment:** `.github/workflows/ci.yml` runs lint, type checks, unit tests and end-to-end tests on every push; on `main` only, and only when all of them pass, it builds and runs `npx wrangler deploy` (Wrangler pinned in the lockfile), then checks that the live `/version.json` reports the pushed commit. Needs the repository secret `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" token). Cloudflare's own Git integration (Workers Builds / Pages) is **not** used: its branch settings could not be managed reliably from the dashboard.
 - **`_headers`:** add cross-origin isolation (`Cross-Origin-Opener-Policy: same-origin`, `Cross-Origin-Embedder-Policy: credentialless`) **only if** the multi-threaded ffmpeg.wasm build is adopted. These headers can break cross-origin resources, so leave them off until needed.
 - **Large WASM files** (ffmpeg core ~30 MB): load from jsDelivr/unpkg pinned to an exact version with Subresource Integrity, or upload to an R2 bucket.
-- **Optional:** put the Pages site behind Cloudflare Access so only you can open it. Not strictly necessary — the hosted page contains no secrets, and the engine token is never in it.
+- **Optional:** put the hosted site behind Cloudflare Access so only you can open it. Not strictly necessary — the hosted page contains no secrets, and the engine token is never in it.
 
 ## 9. Build phases (each ends with a working, deployable state)
 
@@ -329,7 +334,7 @@ werkbank/
 - Monorepo, CI, empty tool registry, UI shell with engine indicator.
 - Engine with `/api/health`, token + origin + host checks, serves the UI.
 - `install.ps1` for uv + FFmpeg + Deno.
-- Cloudflare Pages deployment working.
+- Cloudflare deployment working (Workers Static Assets via GitHub Actions — see §8).
 - ✅ Accept when: Mode A opens at `127.0.0.1:8765` showing 🟢 with dependency versions; Mode B loads from Cloudflare showing ⚪.
 
 **Phase 1 — The four requested tools on the engine**

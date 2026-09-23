@@ -1,0 +1,6 @@
+* text=auto
+# Windows scripts: CRLF (cmd.exe mis-parses some LF-only batch files); shell scripts: LF.
+*.cmd text eol=crlf
+*.bat text eol=crlf
+*.ps1 text eol=crlf
+*.sh text eol=lf

@@ -1,15 +1,28 @@
 name: CI
 
+# Every push and pull request: lint, type checks, unit tests (web + engine), end-to-end acceptance
+# tests, and a real run of the Windows installer. Pushes to main deploy the static UI to Cloudflare,
+# but only after web, engine and e2e pass (the installer job does not affect the hosted site).
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+env:
+  UV_VERSION: '0.12.18'
+  DENO_VERSION: '2.9.6'
+
 jobs:
   web:
+    name: Web (lint, types, unit tests, build)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -18,9 +31,158 @@ jobs:
           node-version-file: .node-version
           cache: npm
       - run: npm ci
-      - run: npm run build -w apps/web
-      # Cloudflare Pages rejects any single file over 25 MiB.
-      - name: Check Pages per-file size limit
+      - name: Tool registry JSON is up to date
+        run: npm run gen:check -w packages/shared
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+      - name: Cloudflare per-file size limit (25 MiB)
         run: |
           big=$(find apps/web/dist -type f -size +25M)
           if [ -n "$big" ]; then echo "Files over 25 MiB:"; echo "$big"; exit 1; fi
+      - name: Windows scripts are ASCII-only (Windows PowerShell 5.1 and cmd.exe)
+        run: |
+          if LC_ALL=C grep -nP '[^\x00-\x7F]' scripts/*.ps1 scripts/*.cmd; then exit 1; fi
+
+  engine:
+    name: Engine (ruff, pytest)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: engine
+    steps:
+      - uses: actions/checkout@v5
+      - run: pipx install "uv==${UV_VERSION}"
+      - run: uv sync --frozen
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pytest
+
+  e2e:
+    name: End-to-end (Mode A 🟢, Mode B ⚪)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: pipx install "uv==${UV_VERSION}"
+      - name: Install FFmpeg and Deno (required engine dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          npm install -g "deno@${DENO_VERSION}"
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: uv sync --project engine --frozen
+      - run: npm run build
+      - run: npm run e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: test-results/
+          retention-days: 7
+
+  windows-installer:
+    name: Windows installer (install.ps1, start.cmd, health)
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v5
+      # The runner's own Node.js may be older than 22; users get Node.js LTS from winget instead.
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+      - name: winget is available
+        shell: powershell
+        run: |
+          if (-not (Get-Command winget -ErrorAction SilentlyContinue)) {
+            Write-Host '::error::winget is not available on this runner'
+            exit 1
+          }
+          winget --version
+      - name: Every winget package ID in the project exists (DESIGN.md 6.3)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $ids = Select-String -Path scripts/install.ps1, engine/werkbank_engine/deps.py `
+                   -Pattern "(?:Id = '|--id )([A-Za-z0-9][A-Za-z0-9.\-]+)" -AllMatches |
+                 ForEach-Object { $_.Matches } | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique
+          $failed = @()
+          foreach ($id in $ids) {
+            winget show --id $id --exact --accept-source-agreements --disable-interactivity | Out-Null
+            if ($LASTEXITCODE -eq 0) { Write-Host "OK      $id" } else { Write-Host "MISSING $id"; $failed += $id }
+          }
+          if ($failed.Count -gt 0) { Write-Host "::error::Unknown winget IDs: $($failed -join ', ')"; exit 1 }
+      - name: Run the installer (Windows PowerShell 5.1)
+        shell: cmd
+        run: powershell -NoProfile -ExecutionPolicy Bypass -File scripts\install.ps1 -NoShortcut -NoStart
+      - name: Start the engine like the desktop shortcut and check /api/health
+        shell: powershell
+        run: |
+          Start-Process -FilePath cmd.exe -ArgumentList '/c', 'scripts\start.cmd' -WindowStyle Hidden
+          $token = $null
+          for ($i = 0; $i -lt 120 -and -not $token; $i++) {
+            Start-Sleep -Seconds 1
+            try {
+              $index = Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/
+              if ($index.Content -match 'name="werkbank-token" content="([^"]+)"') { $token = $Matches[1] }
+            } catch { }
+          }
+          if (-not $token) { throw 'The engine did not serve the UI with its token within 120 s' }
+          $headers = @{ Authorization = "Bearer $token" }
+          $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8765/api/health?refresh=true' -Headers $headers
+          $health.dependencies | Format-Table id, required, available, version, path -AutoSize | Out-String -Width 250
+          "Hardware encoders usable: $($health.hardwareEncoders.usable -join ', ')"
+          if ($health.status -ne 'ok') { throw "Engine status is '$($health.status)', expected 'ok'" }
+          try {
+            Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/api/health | Out-Null
+            throw 'The API answered without a token'
+          } catch [System.Net.WebException] {
+            if ([int]$_.Exception.Response.StatusCode -ne 401) { throw }
+          }
+          'Windows install and engine health: OK'
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: [web, engine, e2e]
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: https://localutilities.cobus-w.workers.dev
+    concurrency:
+      group: deploy-production
+      cancel-in-progress: false
+    steps:
+      - name: Check Cloudflare token is configured
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ]; then
+            echo "::error::Repository secret CLOUDFLARE_API_TOKEN is not set (see README, 'Hosted UI')."
+            exit 1
+          fi
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w apps/web
+      - name: Deploy with the repo-pinned wrangler
+        run: npx wrangler deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      - name: Verify the live site serves this commit
+        run: |
+          for i in $(seq 1 12); do
+            live=$(curl -fsS https://localutilities.cobus-w.workers.dev/version.json | jq -r .commit || true)
+            echo "live=$live expected=$GITHUB_SHA"
+            [ "$live" = "$GITHUB_SHA" ] && exit 0
+            sleep 5
+          done
+          echo "::error::Live site is not serving $GITHUB_SHA"; exit 1

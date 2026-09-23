@@ -1,0 +1,16 @@
+{
+  "name": "@werkbank/shared",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./tools.json": "./dist/tools.json"
+  },
+  "scripts": {
+    "gen": "node scripts/gen-registry.ts",
+    "gen:check": "node scripts/gen-registry.ts --check",
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  }
+}

@@ -1,6 +1,7 @@
 {
   "name": "werkbank",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"
@@ -10,9 +11,22 @@
   },
   "scripts": {
     "build": "npm run build -w apps/web",
-    "typecheck": "npm run typecheck -w apps/web"
+    "gen:registry": "npm run gen -w packages/shared",
+    "lint": "eslint .",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p e2e/tsconfig.json",
+    "test": "npm run test --workspaces --if-present",
+    "e2e": "playwright test"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^26.6.2",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
+    "typescript": "6.0.3",
+    "typescript-eslint": "^8.70.1",
+    "vitest": "^5.0.1",
     "wrangler": "^4.136.3"
   }
 }

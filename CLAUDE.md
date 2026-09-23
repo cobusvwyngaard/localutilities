@@ -3,7 +3,7 @@
 Read `DESIGN.md` before starting any task. It is the source of truth; if a request conflicts with it, say so before proceeding.
 
 ## What this is
-A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`engine`) on `127.0.0.1:8765`. Cloudflare Pages hosts only the static UI. No file is ever sent to a remote server.
+A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`engine`) on `127.0.0.1:8765`. Cloudflare (an assets-only Worker, deployed from GitHub Actions on `main`) hosts only the static UI. No file is ever sent to a remote server.
 
 ## Non-negotiables
 - **No cloud processing.** Never add a feature that uploads user files anywhere.
@@ -23,10 +23,12 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 - Python: uv, ruff, pytest. TypeScript: strict mode, ESLint, Vitest, Playwright.
 
 ## Commands
-- Engine dev: `cd engine && uv run uvicorn werkbank_engine.main:app --host 127.0.0.1 --port 8765 --reload`
-- Web dev: `npm run dev -w apps/web` (proxy `/api` to the engine)
-- Tests: `uv run pytest` (engine), `npm test` (web)
+- Engine dev: `cd engine && uv run uvicorn werkbank_engine.main:app --host 127.0.0.1 --port 8765 --reload` (on Windows leave out `--reload`: uvicorn's reload mode uses an event loop that cannot run subprocesses), or `uv run werkbank-engine`
+- Web dev: `npm run dev -w apps/web` (proxies `/api` to the engine and injects the local engine's token)
+- Tests: `cd engine && uv run pytest` (engine), `npm test` (web + registry), `npm run build && npm run e2e` (Playwright acceptance tests; need uv, FFmpeg, Deno)
+- Lint/types: `npm run lint`, `npm run typecheck`, `cd engine && uv run ruff check . && uv run ruff format --check .`
 - Build UI for engine to serve: `npm run build -w apps/web`
+- Windows scripts (`scripts/*.ps1`, `*.cmd`) must stay ASCII-only and Windows PowerShell 5.1 compatible.
 
 ## When adding a tool
 1. Registry entry with params, `runsIn`, `browserLimitBytes`.
@@ -37,6 +39,7 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 
 ## External dependency facts (verified Sept 2026 — re-check if something breaks)
 - yt-dlp needs Deno (or another supported JS runtime) plus `yt-dlp-ejs` for YouTube; keep yt-dlp current.
-- Cloudflare Pages: 25 MiB per-file limit — load the ffmpeg.wasm core from a pinned CDN URL with SRI or from R2.
+- Cloudflare static hosting (Workers Static Assets): 25 MiB per-file limit — load the ffmpeg.wasm core from a pinned CDN URL with SRI or from R2.
+- Deployment: `.github/workflows/ci.yml` deploys `main` with `npx wrangler deploy` after all checks pass (secret `CLOUDFLARE_API_TOKEN`). Never deploy from any other branch.
 - Chrome 142+ shows a Local Network Access prompt when the hosted page calls the engine; Safari blocks it entirely. Mode A (same-origin) avoids both.
 - pdf-lib cannot decrypt PDFs; use pikepdf (engine) or a qpdf WASM build (browser).
