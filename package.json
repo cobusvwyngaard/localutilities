@@ -11,5 +11,8 @@
   "scripts": {
     "build": "npm run build -w apps/web",
     "typecheck": "npm run typecheck -w apps/web"
+  },
+  "devDependencies": {
+    "wrangler": "^4.136.3"
   }
 }

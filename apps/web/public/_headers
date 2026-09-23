@@ -1,4 +1,4 @@
-# Cloudflare Pages response headers.
+# Cloudflare static asset response headers (Workers Static Assets and Pages both read this file).
 # Cross-origin isolation (COOP/COEP) is deliberately NOT set: only add it if the
 # multi-threaded ffmpeg.wasm build is adopted (DESIGN.md §8).
 /*

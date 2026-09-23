@@ -1,0 +1,11 @@
+// Cloudflare Workers Static Assets: serves the static UI only (DESIGN.md §8).
+// No Worker script — there is no server-side code and no file processing on Cloudflare.
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "localutilities",
+  "compatibility_date": "2026-09-01",
+  "assets": {
+    "directory": "./apps/web/dist",
+    "not_found_handling": "single-page-application"
+  }
+}

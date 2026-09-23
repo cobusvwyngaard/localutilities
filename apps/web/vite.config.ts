@@ -1,10 +1,11 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Cloudflare Pages sets CF_PAGES_* during its build; locally they are absent.
+// Set by Cloudflare during its build (Workers Builds: WORKERS_CI_*, Pages: CF_PAGES_*); absent locally.
+const env = process.env;
 const build = {
-  commit: process.env.CF_PAGES_COMMIT_SHA ?? 'local',
-  branch: process.env.CF_PAGES_BRANCH ?? 'local',
+  commit: env.WORKERS_CI_COMMIT_SHA ?? env.CF_PAGES_COMMIT_SHA ?? 'local',
+  branch: env.WORKERS_CI_BRANCH ?? env.CF_PAGES_BRANCH ?? 'local',
   builtAt: new Date().toISOString(),
 };
 
