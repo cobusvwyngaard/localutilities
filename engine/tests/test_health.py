@@ -32,7 +32,7 @@ def test_health_reports_versions_encoders_and_disk(client: TestClient, auth: dic
     assert deps["pikepdf"]["detail"].startswith("qpdf ")
     assert deps["ghostscript"]["available"] is False
     assert deps["ghostscript"]["required"] is False
-    assert deps["ghostscript"]["fix"] == "winget install --id ArtifexSoftware.GhostScript -e"
+    assert deps["ghostscript"]["fix"] == "https://ghostscript.com/releases/gsdnld.html"
     assert body["hardwareEncoders"] == {
         "listed": ["h264_nvenc", "h264_qsv", "h264_amf"],
         "usable": ["h264_nvenc"],

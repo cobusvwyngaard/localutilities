@@ -275,7 +275,7 @@ Installed by `scripts/install.ps1` with **winget** — the script must verify ea
 | Node.js (LTS, ≥ 22) | Building the UI that the engine serves (`npm run build -w apps/web`) | Yes |
 | FFmpeg (full build, e.g. Gyan's) | All media | Yes |
 | Deno | yt-dlp YouTube support | Yes, for downloader |
-| Ghostscript | PDF compression | Phase 2 |
+| Ghostscript | PDF compression | Phase 2 — **not in winget** (`ArtifexSoftware.GhostScript` was removed in September 2025): install from ghostscript.com; decide in Phase 2 whether the installer downloads it (with checksum) |
 | Tesseract (+ `afr` language data) | OCR | Phase 3 |
 | LibreOffice | Office → PDF | Phase 3 |
 | Pandoc | Markdown → DOCX | Phase 3 |

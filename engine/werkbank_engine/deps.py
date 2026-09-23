@@ -100,7 +100,8 @@ PROGRAMS: tuple[ProgramSpec, ...] = (
         version_args=("--version",),
         version_pattern=r"(?m)^(\d+\.\d+(?:\.\d+)?)",
         fix={
-            "windows": "winget install --id ArtifexSoftware.GhostScript -e",
+            # Removed from winget in September 2025; the official installer is the only source.
+            "windows": "https://ghostscript.com/releases/gsdnld.html",
             "darwin": "brew install ghostscript",
             "linux": "sudo apt install ghostscript",
         },
