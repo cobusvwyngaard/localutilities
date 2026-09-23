@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { DependencyStatus, HealthReport } from '../engine-client/health.ts';
 import { indicatorFor, type EngineState } from '../engine-client/indicator.ts';
 import { formatBytes } from '../format.ts';
+import { PORTABLE_DOWNLOAD_URL } from '../download.ts';
 
 const card = 'rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900';
 
@@ -28,6 +29,16 @@ function ModeCard({ state }: { state: EngineState }) {
           <p>
             Tools that need the engine (downloads, large videos, OCR) run on your laptop. Start Werkbank there
             and open <code className="rounded bg-zinc-100 px-1 dark:bg-zinc-800">http://127.0.0.1:8765</code>.
+          </p>
+          <p>
+            <a
+              href={PORTABLE_DOWNLOAD_URL}
+              className="font-medium text-blue-700 underline hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Download Werkbank for Windows
+            </a>{' '}
+            — a portable app: extract the zip and double-click Werkbank.exe. Nothing is installed and no
+            administrator rights are needed.
           </p>
         </div>
       )}

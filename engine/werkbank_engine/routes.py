@@ -17,6 +17,7 @@ from werkbank_engine.health import HealthReport, HealthService
 from werkbank_engine.jobs import Job, JobManager, JobRequest, JobRequestError
 from werkbank_engine.procs import ProcessError, run_exec
 from werkbank_engine.registry import ParamError
+from werkbank_engine.runtime import ytdlp_executable
 from werkbank_engine.security import require_api_access
 
 api = APIRouter(prefix="/api", dependencies=[Depends(require_api_access)])
@@ -142,11 +143,19 @@ def find_uv() -> str | None:
 
 
 async def update_ytdlp() -> tuple[bool, str]:
-    """Upgrade yt-dlp (with yt-dlp-ejs) in the engine's own environment (DESIGN.md §5.1)."""
-    uv = find_uv()
-    if uv is None:
-        return False, "uv was not found. Re-run the installer."
-    args = [uv, "pip", "install", "--python", sys.executable, "--upgrade", "yt-dlp[default]"]
+    """Update yt-dlp to its latest release (DESIGN.md §5.1).
+
+    Portable app: the standalone executable updates itself (`yt-dlp -U` downloads the release and
+    checks it against the published SHA-256 sums); its bin folder must be writable.
+    Development: upgrade the package (with yt-dlp-ejs) in the engine's environment with uv."""
+    standalone = ytdlp_executable()
+    if standalone is not None:
+        args = [str(standalone), "--update"]
+    else:
+        uv = find_uv()
+        if uv is None:
+            return False, "uv was not found. In the repository run: uv sync --project engine"
+        args = [uv, "pip", "install", "--python", sys.executable, "--upgrade", "yt-dlp[default]"]
     try:
         result = await run_exec(args, limit_seconds=300)
     except ProcessError as exc:

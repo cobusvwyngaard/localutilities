@@ -20,7 +20,7 @@ NOT_BUILT_PAGE = """<!doctype html>
 <p>The user interface has not been built yet. In the repository folder, run:</p>
 <pre>npm ci
 npm run build -w apps/web</pre>
-<p>then reload this page. (The installer does this for you.)</p></body></html>
+<p>then reload this page. (The portable app includes the built interface.)</p></body></html>
 """
 
 

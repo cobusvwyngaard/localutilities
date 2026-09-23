@@ -16,6 +16,8 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from werkbank_engine.runtime import resource_root
+
 DEFAULT_PORT = 8765
 DEFAULT_HOSTED_ORIGINS = ("https://localutilities.cobus-w.workers.dev",)
 _ORIGIN_RE = re.compile(
@@ -23,8 +25,8 @@ _ORIGIN_RE = re.compile(
 )
 _MIN_TOKEN_LENGTH = 32
 
-# engine/werkbank_engine/config.py -> repository root (the engine runs from a source checkout).
-REPO_ROOT = Path(__file__).resolve().parents[2]
+# The repository in development; the bundled resources in the portable app (see runtime.py).
+REPO_ROOT = resource_root()
 
 
 class ConfigError(ValueError):

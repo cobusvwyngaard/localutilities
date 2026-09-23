@@ -29,6 +29,15 @@ describe('StatusPage', () => {
     render(<StatusPage state={{ kind: 'browser-only' }} onRecheck={noop} />);
     expect(screen.getByText('Browser-only mode')).toBeTruthy();
     expect(screen.queryByText('Dependencies')).toBeNull();
+    const link = screen.getByRole('link', { name: 'Download Werkbank for Windows' });
+    expect(link.getAttribute('href')).toBe(
+      'https://github.com/cobusvwyngaard/localutilities/releases/latest/download/Werkbank-windows-x64.zip',
+    );
+  });
+
+  it('does not offer the download when the page is served by the engine', () => {
+    render(<StatusPage state={{ kind: 'connected', health: sampleHealth() }} onRecheck={noop} />);
+    expect(screen.queryByRole('link', { name: 'Download Werkbank for Windows' })).toBeNull();
   });
 });
 

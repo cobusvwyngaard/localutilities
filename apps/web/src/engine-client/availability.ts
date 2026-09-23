@@ -15,7 +15,8 @@ export function availability(tool: ToolDef, state: EngineState): Availability {
       return {
         ok: false,
         reason: 'needs-engine',
-        message: 'This tool runs on the Werkbank engine. Start Werkbank on your laptop and open http://127.0.0.1:8765 there.',
+        message:
+          'This tool runs in the Werkbank app. Start Werkbank on your laptop and open http://127.0.0.1:8765 there. (No installation: download the portable app from the Status page.)',
       };
     case 'connecting':
       return { ok: false, reason: 'engine-unavailable', message: 'Connecting to the engine…' };

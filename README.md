@@ -16,38 +16,36 @@ convert video and audio (without re-encoding when possible) and unlock PDFs, wit
 drag-and-drop, the Inbox/Outbox folders and a jobs list. The hosted site (Mode B) shows the tools but
 they need the engine until the browser versions arrive in Phase 2 (DESIGN.md §9).
 
-## Install on Windows (Mode A)
+## Use it on Windows (Mode A) — nothing to install
 
-In PowerShell:
+1. Download **[Werkbank-windows-x64.zip](https://github.com/cobusvwyngaard/localutilities/releases/latest/download/Werkbank-windows-x64.zip)**
+   (also linked from the hosted site's Status page).
+2. Extract the whole zip to a folder in your user folder, e.g. `Documents\Werkbank`.
+3. Double-click `Werkbank.exe`. A window opens that runs the engine, and your browser opens
+   `http://127.0.0.1:8765`. Close that window to stop Werkbank.
 
-```powershell
-winget install --id Git.Git -e          # only if Git is not installed yet
-git clone https://github.com/cobusvwyngaard/localutilities.git "$HOME\localutilities"
-cd "$HOME\localutilities"
-powershell -ExecutionPolicy Bypass -File scripts\install.ps1
-```
+No administrator rights, no installer, no PATH changes: the app contains its own Python, FFmpeg,
+FFprobe, Deno and yt-dlp (versions and SHA-256 pinned in
+[`scripts/portable/programs.json`](scripts/portable/programs.json)). Windows SmartScreen may warn the
+first time because the app is not code-signed: **More info → Run anyway** (no admin needed).
 
-The installer uses winget to install whatever is missing of **uv**, **FFmpeg**, **Deno** and
-**Node.js LTS** (Windows may ask for permission for Node.js), sets up the engine, builds the UI,
-puts a **Werkbank** shortcut on the desktop and starts Werkbank. Your browser opens
-`http://127.0.0.1:8765`; the header shows 🟢 when everything is in place, or 🔴 with the exact
-command to fix a missing dependency.
-
-- **Start:** the desktop shortcut (or `scripts\start.cmd`). Closing the engine window stops it.
-- **Update:** `git pull`, then run `scripts\install.ps1` again. yt-dlp can also be updated on its own
-  from the Status page (sites such as YouTube change often).
+- **Update:** download the latest zip and replace the folder. yt-dlp updates itself from the Status
+  page (sites such as YouTube change often); this needs the folder to be writable.
 - **Results** are saved in the Outbox (never overwriting: ` (2)`, ` (3)` are added); big files can be
   put in the Inbox instead of being added through the browser.
 - **Files and settings:** Inbox/Outbox in `%USERPROFILE%\Werkbank`; the engine's config (including
-  its access token) in `%APPDATA%\Werkbank\config.json`.
+  its access token) in `%APPDATA%\Werkbank\config.json`. To remove Werkbank, delete its folder and
+  these two.
 
-macOS / Linux (Debian, Ubuntu): `scripts/install.sh`, then `scripts/start.sh`.
+CI builds the zip on every push ([`scripts/portable/build.py`](scripts/portable/build.py)), runs the
+engine tests on Windows with the bundled programs, smoke-tests the unpacked app with nothing else on
+PATH ([`smoke.py`](scripts/portable/smoke.py)), and on `main` publishes it as a GitHub release.
 
 ## Hosted UI (Mode B) and deployment
 
 The static build of `apps/web` is served by an assets-only Cloudflare Worker
 ([`wrangler.jsonc`](wrangler.jsonc)). [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs on
-every push; on `main`, once the web, engine and end-to-end jobs pass, it runs `npx wrangler deploy`
+every push; on `main`, once every job passes and the portable app is released, it runs `npx wrangler deploy`
 and then checks that the live `/version.json` reports the pushed commit. No other branch deploys.
 
 - Needs the repository secret `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" API token).
@@ -69,6 +67,7 @@ npm run dev -w apps/web                  # UI dev server; proxies /api to the en
 | Lint, types | `npm run lint`, `npm run typecheck`, `cd engine && uv run ruff check . && uv run ruff format --check .` |
 | Unit tests | `npm test` (UI + registry), `cd engine && uv run pytest` |
 | End-to-end | `npm run build && npm run e2e` (needs uv, FFmpeg and Deno on PATH) |
+| Portable app | `npm run build`, then `uv run --project engine --group portable python scripts/portable/build.py` (Windows; `--local-programs` for a Linux test build), then `uv run --project engine python scripts/portable/smoke.py build/portable/dist/Werkbank` |
 | Tool registry | `npm run gen:registry` after editing `packages/shared/src/tools.ts` (CI fails if `tools.json` is stale) |
 
 ## Layout
@@ -78,5 +77,5 @@ apps/web/          React UI (Vite, Tailwind), built for both modes
 packages/shared/   tool registry (TypeScript) -> dist/tools.json for the engine
 engine/            Python FastAPI engine (uv), 127.0.0.1 only
 e2e/               Playwright acceptance tests
-scripts/           install and start scripts (Windows, macOS/Linux)
+scripts/portable/  portable Windows app: build, pinned programs, smoke test
 ```

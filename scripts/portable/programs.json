@@ -1,0 +1,47 @@
+{
+  "comment": "Programs bundled into the portable app (DESIGN.md 6.3). Pinned by version and SHA-256; build.py refuses anything else. yt-dlp updates itself after install (Status page).",
+  "windows": [
+    {
+      "name": "FFmpeg (gyan.dev essentials build)",
+      "version": "9.0.2",
+      "url": "https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip",
+      "sha256": "60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba",
+      "files": {
+        "ffmpeg-9.0.2-essentials_build/bin/ffmpeg.exe": "bin/ffmpeg.exe",
+        "ffmpeg-9.0.2-essentials_build/bin/ffprobe.exe": "bin/ffprobe.exe",
+        "ffmpeg-9.0.2-essentials_build/LICENSE": "licences/FFmpeg-LICENSE.txt"
+      },
+      "licence": "GPL-3.0-or-later (this build enables GPL libraries such as x264 and x265)",
+      "source": "https://ffmpeg.org/releases/ffmpeg-9.0.2.tar.xz and https://www.gyan.dev/ffmpeg/builds/"
+    },
+    {
+      "name": "Deno",
+      "version": "2.9.6",
+      "url": "https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-pc-windows-msvc.zip",
+      "sha256": "15e5300b0ba3c3695a7621d90160a746ec9e710228cee639afa9d580f6e3cd11",
+      "files": { "deno.exe": "bin/deno.exe" },
+      "licence": "MIT",
+      "source": "https://github.com/denoland/deno/tree/v2.9.6"
+    },
+    {
+      "name": "yt-dlp (standalone, includes yt-dlp-ejs)",
+      "version": "2026.08.19",
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp.exe",
+      "sha256": "66674953fe251b89f4d08c5f0e35e0728679bd67ab3d7d05c0562af101dd3e7a",
+      "file": "bin/yt-dlp.exe",
+      "licence": "Unlicense (the executable bundles components under other licences; run yt-dlp --version for details)",
+      "source": "https://github.com/yt-dlp/yt-dlp/tree/2026.08.19"
+    }
+  ],
+  "linux-test": [
+    {
+      "name": "yt-dlp (standalone)",
+      "version": "2026.08.19",
+      "url": "https://github.com/yt-dlp/yt-dlp/releases/download/2026.08.19/yt-dlp_linux",
+      "sha256": "58162f9bfdc27458ea47bfcb311cf47028f17d8154a8bf7d689861d46399230a",
+      "file": "bin/yt-dlp",
+      "licence": "Unlicense",
+      "source": "https://github.com/yt-dlp/yt-dlp/tree/2026.08.19"
+    }
+  ]
+}

@@ -18,6 +18,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from werkbank_engine.procs import ExecResult, ProcessError, run_exec
+from werkbank_engine.runtime import programs_dir
 
 Platform = str  # "windows" | "darwin" | "linux"
 
@@ -40,17 +41,17 @@ class ProgramSpec:
     version_args: tuple[str, ...]
     version_pattern: str
     fix: dict[Platform, str]
+    bundled: bool = False  # shipped in the portable app's bin folder
 
 
-_REINSTALL = {
-    "windows": r"Re-run scripts\install.ps1",
-    "darwin": "Re-run scripts/install.sh",
-    "linux": "Re-run scripts/install.sh",
-}
+# The portable app ships these programs; if one is missing its download is incomplete.
+PORTABLE_FIX = "Download the Werkbank portable app again and extract the whole zip file"
+DEV_PYTHON_FIX = "In the repository: uv sync --project engine"
 
 PROGRAMS: tuple[ProgramSpec, ...] = (
     ProgramSpec(
         id="ffmpeg",
+        bundled=True,
         name="FFmpeg",
         required=True,
         needed_for="All audio and video tools",
@@ -65,6 +66,7 @@ PROGRAMS: tuple[ProgramSpec, ...] = (
     ),
     ProgramSpec(
         id="ffprobe",
+        bundled=True,
         name="FFprobe",
         required=True,
         needed_for="Reading media duration and streams (ships with FFmpeg)",
@@ -79,6 +81,7 @@ PROGRAMS: tuple[ProgramSpec, ...] = (
     ),
     ProgramSpec(
         id="deno",
+        bundled=True,
         name="Deno",
         required=True,
         needed_for="YouTube downloads (yt-dlp needs a JavaScript runtime)",
@@ -313,11 +316,28 @@ class DependencyProber:
         runner: Runner | None = None,
         finder: Callable[[tuple[str, ...], list[Path]], str | None] = find_program,
         env: Mapping[str, str] = os.environ,
+        bundled_dir: Path | None = None,
     ) -> None:
         self.platform = platform or current_platform()
         self._run: Runner = runner or (lambda args, limit: run_exec(args, limit))
         self._find = finder
         self._extra_dirs = extra_search_dirs(self.platform, env)
+        # The portable app's bin folder wins over anything installed on the machine.
+        self.bundled_dir = bundled_dir if bundled_dir is not None else programs_dir(env)
+
+    def _fix(self, spec: ProgramSpec) -> str:
+        return PORTABLE_FIX if self.bundled_dir and spec.bundled else spec.fix[self.platform]
+
+    def _locate_bundled(self, names: tuple[str, ...]) -> str | None:
+        if self.bundled_dir and self.bundled_dir.is_dir():
+            for name in names:
+                found = shutil.which(name, path=str(self.bundled_dir))
+                if found:
+                    return found
+        return None
+
+    def _locate(self, names: tuple[str, ...]) -> str | None:
+        return self._locate_bundled(names) or self._find(names, self._extra_dirs)
 
     async def probe_program(self, spec: ProgramSpec) -> DependencyResult:
         result = DependencyResult(
@@ -327,30 +347,59 @@ class DependencyProber:
             needed_for=spec.needed_for,
             available=False,
         )
-        path = self._find(spec.executables[self.platform], self._extra_dirs)
+        path = self._locate(spec.executables[self.platform])
         if path is None:
-            result.fix = spec.fix[self.platform]
+            result.fix = self._fix(spec)
             result.detail = "Not found on PATH"
             return result
         result.path = path
         try:
             out = await self._run([path, *spec.version_args], 30.0)
         except ProcessError as exc:
-            result.fix = spec.fix[self.platform]
+            result.fix = self._fix(spec)
             result.detail = f"Found but could not run: {exc}"
             return result
         text = out.stdout + "\n" + out.stderr
         result.version = parse_version(spec.version_pattern, text)
         if out.returncode != 0 and result.version is None:
-            result.fix = spec.fix[self.platform]
+            result.fix = self._fix(spec)
             result.detail = f"Found but '{' '.join(spec.version_args)}' exited with code {out.returncode}"
             return result
         result.available = True
         return result
 
-    def probe_python_packages(self) -> list[DependencyResult]:
+    def _ytdlp_notes(self, ytdlp_version: str, ejs: str | None) -> str:
+        notes = [ejs]
+        age = ytdlp_age_days(ytdlp_version)
+        if age is not None:
+            notes.append(f"released {age} days ago")
+        return "; ".join(n for n in notes if n)
+
+    async def probe_standalone_ytdlp(self, path: Path) -> DependencyResult:
+        """The portable app's own yt-dlp executable (it includes yt-dlp-ejs)."""
+        res = DependencyResult(
+            id="yt-dlp", name="yt-dlp", required=True, needed_for="Media downloader", available=False,
+            path=str(path),
+        )  # fmt: skip
+        try:
+            out = await self._run([str(path), "--version"], 60.0)
+        except ProcessError as exc:
+            res.fix, res.detail = PORTABLE_FIX, f"Found but could not run: {exc}"
+            return res
+        res.version = parse_version(r"(?m)^(\d{4}\.\d{1,2}\.\d{1,2}\S*)", out.stdout)
+        if out.returncode != 0 or res.version is None:
+            res.fix = PORTABLE_FIX
+            res.detail = f"Found but '--version' exited with code {out.returncode}"
+            return res
+        res.available = True
+        res.detail = self._ytdlp_notes(res.version, "standalone build with yt-dlp-ejs")
+        return res
+
+    def probe_python_packages(self, skip: frozenset[str] = frozenset()) -> list[DependencyResult]:
         results = []
         for dep_id, dist, needed_for in PYTHON_PACKAGES:
+            if dep_id in skip:
+                continue
             res = DependencyResult(
                 id=dep_id, name=dist, required=True, needed_for=needed_for, available=False
             )
@@ -358,24 +407,26 @@ class DependencyProber:
                 res.version = version(dist)
                 res.available = True
             except PackageNotFoundError:
-                res.fix = _REINSTALL[self.platform]
-                res.detail = "Python package not installed in the engine environment"
+                res.fix = PORTABLE_FIX if self.bundled_dir else DEV_PYTHON_FIX
+                res.detail = "Python package not included in the engine"
             if res.available and dep_id == "yt-dlp" and res.version:
-                age = ytdlp_age_days(res.version)
                 try:
-                    ejs = version("yt-dlp-ejs")
+                    ejs = f"yt-dlp-ejs {version('yt-dlp-ejs')}"
                 except PackageNotFoundError:
-                    ejs = None
-                notes = [f"yt-dlp-ejs {ejs}" if ejs else "yt-dlp-ejs missing (YouTube will not work)"]
-                if age is not None:
-                    notes.append(f"released {age} days ago")
-                res.detail = "; ".join(notes)
+                    ejs = "yt-dlp-ejs missing (YouTube will not work)"
+                res.detail = self._ytdlp_notes(res.version, ejs)
             if res.available and dep_id == "pikepdf":
                 import pikepdf  # heavy import, only when probing
 
                 res.detail = f"qpdf {pikepdf.__libqpdf_version__}"
             results.append(res)
         return results
+
+    def standalone_ytdlp(self) -> Path | None:
+        if self.bundled_dir is None:
+            return None
+        found = self._locate_bundled(("yt-dlp",))
+        return Path(found) if found else None
 
     async def probe_encoders(self, ffmpeg_path: str) -> EncoderResult:
         try:
@@ -413,5 +464,8 @@ class DependencyProber:
     async def probe_dependencies(self) -> list[DependencyResult]:
         """Programs and Python packages (fast). Hardware encoders are probed separately (slow)."""
         programs = await asyncio.gather(*(self.probe_program(spec) for spec in PROGRAMS))
-        packages = self.probe_python_packages()
+        standalone = self.standalone_ytdlp()
+        packages = self.probe_python_packages(skip=frozenset({"yt-dlp"}) if standalone else frozenset())
+        if standalone:
+            packages.insert(0, await self.probe_standalone_ytdlp(standalone))
         return sorted([*programs, *packages], key=lambda r: not r.required)  # required first, stable

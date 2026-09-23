@@ -21,6 +21,9 @@ dev = [
     "httpx2>=2.13.1",
     "ruff>=0.16.8",
 ]
+portable = [
+    "pyinstaller>=6.22.3",
+]
 
 [build-system]
 requires = ["hatchling>=1.27"]

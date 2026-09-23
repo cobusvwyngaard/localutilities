@@ -30,6 +30,7 @@ from werkbank_engine.health import HealthService
 from werkbank_engine.jobs import JobManager
 from werkbank_engine.registry import RegistryError, load_registry
 from werkbank_engine.routes import api, update_ytdlp
+from werkbank_engine.runtime import FROZEN
 from werkbank_engine.security import LoopbackGuardMiddleware
 from werkbank_engine.tools import IMPLEMENTATIONS
 from werkbank_engine.webui import mount_web_ui
@@ -124,9 +125,44 @@ def _open_when_ready(port: int, url: str, timeout: float = 60.0) -> None:
         time.sleep(0.2)
 
 
+def _disable_quick_edit() -> None:
+    """Windows consoles pause a program's output while text is selected ("QuickEdit"); a stray click
+    in the Werkbank window would then freeze the engine until Esc is pressed. Turn that off."""
+    if sys.platform != "win32":
+        return
+    import ctypes
+
+    kernel32 = ctypes.windll.kernel32
+    handle = kernel32.GetStdHandle(-10)  # STD_INPUT_HANDLE
+    mode = ctypes.c_uint32()
+    if handle and kernel32.GetConsoleMode(handle, ctypes.byref(mode)):
+        enable_extended_flags, enable_quick_edit_mode = 0x0080, 0x0040
+        kernel32.SetConsoleMode(handle, (mode.value | enable_extended_flags) & ~enable_quick_edit_mode)
+
+
+def _pause_before_exit() -> None:
+    """The portable app runs in its own console window; keep an error readable before it closes."""
+    if FROZEN and sys.stdin and sys.stdin.isatty():
+        with contextlib.suppress(EOFError, OSError):
+            input("Press Enter to close this window.")
+
+
 def main(argv: list[str] | None = None) -> int:
+    code = _main(argv)
+    if code not in (0, None):
+        _pause_before_exit()
+    return code
+
+
+def _main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="werkbank-engine", description="Werkbank local engine")
-    parser.add_argument("--open", action="store_true", help="open the UI in the browser once ready")
+    # The portable app is started by double-clicking, so it opens the browser unless told not to.
+    parser.add_argument(
+        "--open",
+        action=argparse.BooleanOptionalAction,
+        default=FROZEN,
+        help="open the UI in the browser once ready",
+    )
     parser.add_argument("--port", type=int, help="override the port from the config file")
     parser.add_argument(
         "--update-ytdlp", action="store_true", help="update yt-dlp to its latest release and exit"
@@ -159,6 +195,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    if FROZEN:
+        _disable_quick_edit()
     print(f"Werkbank engine {__version__} starting at {url} (close this window to stop it)")
     if args.open:
         threading.Thread(target=_open_when_ready, args=(settings.port, url), daemon=True).start()
@@ -169,5 +207,6 @@ def main(argv: list[str] | None = None) -> int:
         proxy_headers=False,
         server_header=False,
         log_level="info",
+        access_log=not FROZEN,  # the UI polls /api/health; keep the portable app's window readable
     )
     return 0

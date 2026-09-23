@@ -1,5 +1,6 @@
-"""download.media — yt-dlp with Deno (DESIGN.md §5.1). yt-dlp runs as `python -m yt_dlp` in the
-engine's own environment, with FFmpeg and Deno passed explicitly (PATH may be stale on Windows)."""
+"""download.media — yt-dlp with Deno (DESIGN.md §5.1). The portable app runs its standalone
+yt-dlp executable; a development checkout runs `python -m yt_dlp` in the engine's environment.
+FFmpeg and Deno are passed explicitly (PATH may be stale on Windows)."""
 
 from __future__ import annotations
 
@@ -35,11 +36,15 @@ STAGES = {
 }
 
 
+def ytdlp_command(standalone: str | None) -> list[str]:
+    return [standalone] if standalone else [sys.executable, "-m", "yt_dlp"]
+
+
 def build_args(
-    python: str, ffmpeg: str, deno: str | None, work: Path, url: str, params: dict, windows: bool
+    ytdlp: list[str], ffmpeg: str, deno: str | None, work: Path, url: str, params: dict, windows: bool
 ) -> list[str]:
     args = [
-        python, "-m", "yt_dlp",
+        *ytdlp,
         "--ignore-config", "--no-color", "--newline", "--no-mtime",
         "--progress-template", f"download:{PROGRESS_TAG} %(progress.downloaded_bytes)s "
         "%(progress.total_bytes)s %(progress.total_bytes_estimate)s",
@@ -105,7 +110,8 @@ async def run(ctx: ToolContext) -> None:
         raise ToolError("expected a web address")
     ffmpeg = ctx.program("ffmpeg")
     deno = ctx.program("deno")
-    args = build_args(sys.executable, ffmpeg, deno, ctx.work, url, ctx.params, windows=os.name == "nt")
+    ytdlp = ytdlp_command(ctx.program_path("yt-dlp"))
+    args = build_args(ytdlp, ffmpeg, deno, ctx.work, url, ctx.params, windows=os.name == "nt")
     # Tools yt-dlp starts on its own find FFmpeg and Deno on PATH too.
     env = dict(os.environ)
     env["PATH"] = os.pathsep.join([str(Path(ffmpeg).parent), str(Path(deno).parent), env.get("PATH", "")])

@@ -1,5 +1,7 @@
 # Werkbank — local-first utilities suite
-*Design document, v0.2 — 23 September 2026. "Werkbank" is a placeholder name.*
+*Design document, v0.3 — 23 September 2026. "Werkbank" is a placeholder name.*
+
+*v0.3 (owner's decision): **nothing is installed on the laptop.** The engine ships as a portable Windows app — a zip with `Werkbank.exe`, its own Python, FFmpeg, FFprobe, Deno and the standalone yt-dlp — that runs without an installer, administrator rights, winget or PATH changes (§6.3). The winget installer and start scripts are gone. Processing happens in the portable app only; browser-side processing (Mode B tools, Phase 2 browser path) is dropped, and the hosted site serves the UI and the download link.*
 
 *v0.2: hosting is an assets-only Cloudflare Worker (Workers Static Assets) deployed from GitHub Actions, replacing the Cloudflare Pages Git integration; Node.js added as a laptop dependency (it builds the UI the engine serves).*
 
@@ -179,10 +181,10 @@ Phase numbers refer to §9. **E** = engine (native), **B** = browser.
 - SponsorBlock removal (`--sponsorblock-remove sponsor`).
 - "Info" button: `yt-dlp -J` to show title, duration, available formats before downloading.
 
-**As built (phase 1):** the format filters use `height<=?N` instead of `height<=N`, so formats whose height is unknown are not rejected; yt-dlp runs as `python -m yt_dlp` from the engine's environment with `--js-runtimes deno:<path>` and `--ffmpeg-location <path>` (a PATH inherited before a winget install may miss both), `--ignore-config`, `--no-mtime`, and the URL after `--`. Not built yet: the "Info" button and the cookies option.
+**As built (phase 1):** the format filters use `height<=?N` instead of `height<=N`, so formats whose height is unknown are not rejected; yt-dlp runs as the bundled standalone `bin/yt-dlp.exe` in the portable app (`python -m yt_dlp` in development) with `--js-runtimes deno:<path>` and `--ffmpeg-location <path>` (a PATH inherited before a winget install may miss both), `--ignore-config`, `--no-mtime`, and the URL after `--`. Not built yet: the "Info" button and the cookies option.
 
 **Maintenance:**
-- Engine checks the installed yt-dlp version at start-up; if older than 30 days, it offers a one-click update (`uv pip install -U "yt-dlp[default]"` in the engine's virtual environment). *As built:* the health page shows the release age and an **Update yt-dlp** button (`POST /api/admin/update-ytdlp`); the installer also updates it after syncing from the lockfile; the start scripts use `uv run --no-sync`, because a sync would downgrade yt-dlp to the locked version.
+- Engine checks the installed yt-dlp version at start-up; if older than 30 days, it offers a one-click update (`uv pip install -U "yt-dlp[default]"` in the engine's virtual environment). *As built:* the health page shows the release age and an **Update yt-dlp** button (`POST /api/admin/update-ytdlp`). In the portable app it runs `yt-dlp.exe --update`, which replaces the executable in `bin/` after checking the published SHA-256 (the folder must be writable, so the README says to extract into the user folder); in development it upgrades the package with uv.
 - Health check verifies `deno --version`; if missing, the downloader shows a clear fix-it message.
 - Age-restricted/members-only videos need `--cookies-from-browser`. On Windows, cookie extraction from Chromium browsers is unreliable because of Chrome's app-bound cookie encryption; Firefox is the more dependable source. Using account cookies carries some risk of the account being flagged — keep this an explicit, off-by-default option.
 
@@ -271,7 +273,16 @@ Using the Python library (rather than the `qpdf` CLI) keeps the password out of 
 
 ### 6.3 Dependencies (Windows first; macOS/Linux via Homebrew/apt)
 
-Installed by `scripts/install.ps1` with **winget** — the script must verify each package ID with `winget search` before use:
+**v0.3: bundled in the portable app, not installed.** `scripts/portable/build.py` (run by CI on Windows) freezes the engine with PyInstaller (one folder: `Werkbank.exe` + `_internal/` with Python, the engine's packages, the built UI and `tools.json`) and adds `bin/` with programs pinned by version **and SHA-256** in `scripts/portable/programs.json`. The engine looks in `bin/` before PATH (`werkbank_engine/runtime.py`). Settings stay in `%APPDATA%\Werkbank`, Inbox/Outbox in `%USERPROFILE%\Werkbank`; nothing needs administrator rights. On `main`, CI publishes the zip as a GitHub release (`build-<run number>`); the hosted site links to the latest.
+
+| Bundled (Phase 1) | Source | Licence |
+|---|---|---|
+| FFmpeg + FFprobe 9.0.2 | gyan.dev "essentials" build (x264, x265, Opus, Vorbis, LAME, NVENC, QSV, AMF) | GPL-3.0 |
+| Deno 2.9.6 | Official release zip | MIT |
+| yt-dlp (standalone `yt-dlp.exe`) | Official release; includes yt-dlp-ejs; updates itself (`--update` checks the published SHA-256) | Unlicense |
+| Python 3.12, FastAPI, Uvicorn, pikepdf (qpdf) | Frozen into `_internal/` | Various open source |
+
+Later-phase programs must also run from `bin/` without installation, or the tool does not ship. The original v0.2 list (installed with winget) is kept below for reference:
 
 | Dependency | Needed for | Required? |
 |---|---|---|
@@ -291,7 +302,8 @@ Python packages (`engine/pyproject.toml`): `fastapi`, `uvicorn`, `yt-dlp[default
 
 ### 6.4 Starting the engine
 
-- Phase 0/1: `scripts\start.cmd` (the installer puts a **Werkbank** shortcut to it on the desktop) → starts the engine and opens `http://127.0.0.1:8765`; if the engine is already running it only opens the browser.
+- Double-click `Werkbank.exe` (portable app) → starts the engine in a console window and opens `http://127.0.0.1:8765`; if the engine is already running it only opens the browser. Closing the window stops it. The console's QuickEdit mode is switched off, so a stray click cannot freeze the engine.
+- Development: `uv run --project engine werkbank-engine --open`.
 - Later: a system-tray icon (pystray) with Start/Stop/Open/Update, optionally started at login.
 
 ## 7. Front end
@@ -318,13 +330,13 @@ werkbank/
 ├─ engine/
 │  ├─ pyproject.toml
 │  └─ werkbank_engine/{main.py,jobs.py,security.py,tools/…}
-├─ scripts/{install.ps1,install.sh,start.cmd,start.sh}
+├─ scripts/portable/         # build.py, programs.json (pinned + SHA-256), smoke.py, README.txt
 ├─ wrangler.jsonc            # Cloudflare Workers Static Assets config
 └─ .github/workflows/ci.yml  # lint + tests for web and engine; deploys main when green
 ```
 
 - The tool registry is authored once in TypeScript and exported to `packages/shared/dist/tools.json`, which the engine reads — one source of truth.
-- **Never commit binaries** (ffmpeg, wasm cores, models). They come from package managers or CDNs.
+- **Never commit binaries** (ffmpeg, wasm cores, models). The portable build downloads them at build time (pinned, SHA-256 checked); the zip is a release asset, not a committed file.
 - **GitHub:** public or private both work; deployment runs from GitHub Actions, so Cloudflare needs no access to the repository.
 - **Cloudflare hosting:** an assets-only Worker (*Workers Static Assets*, no Worker script) configured in `wrangler.jsonc`, serving `apps/web/dist` with single-page-application fallback. Static asset requests are free and unlimited.
 - **Deployment:** `.github/workflows/ci.yml` runs lint, type checks, unit tests and end-to-end tests on every push; on `main` only, and only when all of them pass, it builds and runs `npx wrangler deploy` (Wrangler pinned in the lockfile), then checks that the live `/version.json` reports the pushed commit. Needs the repository secret `CLOUDFLARE_API_TOKEN` ("Edit Cloudflare Workers" token). Cloudflare's own Git integration (Workers Builds / Pages) is **not** used: its branch settings could not be managed reliably from the dashboard.
@@ -346,12 +358,13 @@ werkbank/
 - Downloader, video/audio compression presets (incl. target size and hardware toggle), conversion with remux-first, PDF unlock.
 - Job queue with SSE progress and cancel.
 - ✅ Accept when: a 1 h lecture video compresses with live progress and can be cancelled cleanly; a YouTube video downloads as MP4 and as M4A; an owner-restricted PDF is unlocked without a password and a user-password PDF unlocks only with the correct one.
+- *v0.3: the portable app replaces the installer. CI builds it on Windows, runs the engine tests with the bundled FFmpeg and Deno, and smoke-tests the unpacked app with nothing else on PATH (health with every program from `bin/`, remux, compress, audio convert, PDF unlock, a yt-dlp download, and the yt-dlp self-update).*
 - *Status (23 Sept 2026): built. Verified in CI through the real UI and engine: live progress over SSE and a clean cancel (40-second clip, not 1 h), remux-first conversion, target-size compression within the target, PDF unlock of both kinds (the password is never echoed back), and yt-dlp downloading from a web server; the engine test suite also runs on Windows. **Not yet verified: YouTube** — YouTube refuses cloud/CI addresses ("Sign in to confirm you're not a bot"), so the MP4/M4A download must be confirmed on the owner's laptop.*
 
-**Phase 2 — Browser path and first additions**
-- Mediabunny compression/conversion, qpdf-wasm unlock, pdf-lib page tools, image tools, QR codes, metadata stripping, loudness normalisation, trim/extract audio, Ghostscript compression.
-- Mode B → engine connection (Chrome/Edge permission flow, Firefox, clear Safari message).
-- ✅ Accept when: on a phone, a 50 MB video compresses and a PDF unlocks with nothing installed.
+**Phase 2 — First additions (in the portable app)**
+- PDF page tools, image tools, QR codes, metadata stripping, loudness normalisation, trim/extract audio; PDF compression only if a Ghostscript (AGPL) or alternative can run from `bin/` without installation.
+- ~~Browser path (Mediabunny, qpdf-wasm) and Mode B → engine connection~~ — dropped in v0.3 (processing in the portable app only).
+- ✅ Accept when: each new tool works in the portable app on a clean Windows machine with nothing installed.
 
 **Phase 3 — Academic workflow tools**
 - Transcription (faster-whisper; model size selectable), subtitles, OCR (eng+afr), Office → PDF, Pandoc with citations, noise reduction, split, concat.

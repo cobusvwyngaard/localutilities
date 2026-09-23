@@ -221,8 +221,9 @@ DOWNLOAD_DEFAULTS = {"mode": "video", "quality": "1080", "audioFormat": "m4a", "
 
 def test_download_video_arguments() -> None:
     args = download_media.build_args(
-        "python", "/bin/ffmpeg", "/bin/deno", Path("/work"), "https://example.com/v", DOWNLOAD_DEFAULTS, True
-    )
+        ["python", "-m", "yt_dlp"], "/bin/ffmpeg", "/bin/deno", Path("/work"), "https://example.com/v",
+        DOWNLOAD_DEFAULTS, True,
+    )  # fmt: skip
     assert args[:3] == ["python", "-m", "yt_dlp"]
     assert args[args.index("-f") + 1] == (
         "bv*[height<=?1080][vcodec^=avc1]+ba[ext=m4a]/bv*[height<=?1080]+ba/b[height<=?1080]"
@@ -240,14 +241,20 @@ def test_download_audio_playlist_subtitles_sponsorblock() -> None:
     params = {**DOWNLOAD_DEFAULTS, "mode": "audio", "audioFormat": "mp3", "playlist": True,
               "subtitles": True, "sponsorblock": True}  # fmt: skip
     args = download_media.build_args(
-        "python", "ffmpeg", "deno", Path("/w"), "https://x.test/p", params, False
+        ["yt-dlp.exe"], "ffmpeg", "deno", Path("/w"), "https://x.test/p", params, False
     )
+    assert args[:2] == ["yt-dlp.exe", "--ignore-config"]
     assert args[args.index("-x") + 1 : args.index("-x") + 3] == ["--audio-format", "mp3"]
     assert "--no-playlist" not in args
     assert args[args.index("--sleep-requests") + 1] == "1"
     assert args[args.index("--sub-langs") + 1] == "en.*,af.*"
     assert args[args.index("--sponsorblock-remove") + 1] == "sponsor"
     assert "--windows-filenames" not in args
+
+
+def test_download_uses_the_standalone_ytdlp_when_bundled() -> None:
+    assert download_media.ytdlp_command("C:/Werkbank/bin/yt-dlp.exe") == ["C:/Werkbank/bin/yt-dlp.exe"]
+    assert download_media.ytdlp_command(None)[1:] == ["-m", "yt_dlp"]
 
 
 def test_download_progress_parsing() -> None:

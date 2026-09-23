@@ -153,6 +153,10 @@ class ToolContext:
             raise ToolError(f"{dependency_id} is not installed. See the Status page for how to install it.")
         return path
 
+    def program_path(self, dependency_id: str) -> str | None:
+        """Path of an available dependency, or None (e.g. yt-dlp used as a Python package)."""
+        return self._programs.get(dependency_id)
+
     async def usable_hardware_encoders(self) -> list[str]:
         await self._health.wait_for_encoders()
         report = await self._health.report()

@@ -6,6 +6,7 @@ Read `DESIGN.md` before starting any task. It is the source of truth; if a reque
 A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`engine`) on `127.0.0.1:8765`. Cloudflare (an assets-only Worker, deployed from GitHub Actions on `main`) hosts only the static UI. No file is ever sent to a remote server.
 
 ## Non-negotiables
+- **Nothing to install.** Users run the portable app (`scripts/portable/`): no installer, no admin rights, no winget, no PATH changes. Every program a tool needs is bundled in `bin/`, pinned by version and SHA-256 in `scripts/portable/programs.json`; the engine looks there before PATH (`werkbank_engine/runtime.py`). A tool whose program cannot be bundled that way does not ship.
 - **No cloud processing.** Never add a feature that uploads user files anywhere.
 - **Subprocesses:** `asyncio.create_subprocess_exec` with argument lists only. Never `shell=True`, never string-built commands.
 - **Engine binds to `127.0.0.1` only.** Every `/api/*` route checks bearer token, `Origin` allow-list and `Host` header (`engine/werkbank_engine/security.py`). New routes must use the shared dependency, not reimplement checks.
@@ -28,8 +29,7 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 - Tests: `cd engine && uv run pytest` (engine), `npm test` (web + registry), `npm run build && npm run e2e` (Playwright acceptance tests; need uv, FFmpeg, Deno)
 - Lint/types: `npm run lint`, `npm run typecheck`, `cd engine && uv run ruff check . && uv run ruff format --check .`
 - Build UI for engine to serve: `npm run build -w apps/web`
-- Windows scripts (`scripts/*.ps1`, `*.cmd`) must stay ASCII-only and Windows PowerShell 5.1 compatible.
-- The start scripts run `uv run --no-sync` (a sync would undo an in-app yt-dlp update); the installers sync from the lockfile and then update yt-dlp. After adding an engine dependency, users must re-run the installer.
+- Portable app: `npm run build`, then `uv run --project engine --group portable python scripts/portable/build.py` (Windows; `--local-programs` for a Linux test build); smoke test with `uv run --project engine python scripts/portable/smoke.py build/portable/dist/Werkbank`.
 - Engine tool modules: `engine/werkbank_engine/tools/<id with dots as underscores>.py` with `HEAVY` and `async def run(ctx)`, registered in `tools/__init__.py`; the engine refuses to start if a registry tool has no implementation.
 
 ## When adding a tool
@@ -41,9 +41,9 @@ A local-first utilities suite. React UI (`apps/web`) + Python FastAPI engine (`e
 
 ## External dependency facts (verified Sept 2026 — re-check if something breaks)
 - YouTube refuses cloud and CI addresses ("Sign in to confirm you're not a bot"): YouTube downloads can only be tested on a home connection.
-- Ghostscript is not in winget (removed Sept 2025).
-- yt-dlp needs Deno (or another supported JS runtime) plus `yt-dlp-ejs` for YouTube; keep yt-dlp current.
+- Ghostscript is not in winget (removed Sept 2025); its Windows build is an installer, so bundling it needs a portable build (check the licence: AGPL).
+- yt-dlp needs Deno (or another supported JS runtime) plus `yt-dlp-ejs` for YouTube; keep yt-dlp current. The official standalone `yt-dlp.exe` includes yt-dlp-ejs and updates itself (`--update`, checks SHA-256); the portable app uses it instead of the Python package.
 - Cloudflare static hosting (Workers Static Assets): 25 MiB per-file limit — load the ffmpeg.wasm core from a pinned CDN URL with SRI or from R2.
-- Deployment: `.github/workflows/ci.yml` deploys `main` with `npx wrangler deploy` after all checks pass (secret `CLOUDFLARE_API_TOKEN`). Never deploy from any other branch.
+- Deployment: `.github/workflows/ci.yml` builds and smoke-tests the portable app on Windows on every push; on `main`, after all checks pass, it publishes the zip as GitHub release `build-<run number>` (the hosted site links to `releases/latest/download/Werkbank-windows-x64.zip`) and deploys the UI with `npx wrangler deploy` (secret `CLOUDFLARE_API_TOKEN`). Never deploy or release from any other branch.
 - Chrome 142+ shows a Local Network Access prompt when the hosted page calls the engine; Safari blocks it entirely. Mode A (same-origin) avoids both.
 - pdf-lib cannot decrypt PDFs; use pikepdf (engine) or a qpdf WASM build (browser).
