@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import platform
 import shutil
 import time
@@ -38,6 +39,7 @@ class DependencyStatus(CamelModel):
 class HardwareEncoders(CamelModel):
     listed: list[str]
     usable: list[str]
+    checking: bool  # test encodes still running in the background
 
 
 class DiskInfo(CamelModel):
@@ -73,6 +75,9 @@ def _status(deps: list[DependencyResult]) -> Literal["ok", "degraded"]:
 
 
 class HealthService:
+    """Dependency checks are quick and decide the status; hardware-encoder test encodes can take
+    tens of seconds (one ffmpeg run per GPU encoder), so they run in the background."""
+
     def __init__(self, settings: Settings, tool_count: int, prober: DependencyProber | None = None) -> None:
         self._settings = settings
         self._tool_count = tool_count
@@ -80,6 +85,7 @@ class HealthService:
         self._lock = asyncio.Lock()
         self._deps: list[DependencyResult] | None = None
         self._encoders = EncoderResult()
+        self._encoder_task: asyncio.Task[None] | None = None
         self._checked_at = datetime.now(UTC)
         self._probed_monotonic = 0.0
 
@@ -88,9 +94,39 @@ class HealthService:
             await self._refresh_locked()
 
     async def _refresh_locked(self) -> None:
-        self._deps, self._encoders = await self._prober.probe_all()
+        self._deps = await self._prober.probe_dependencies()
         self._checked_at = datetime.now(UTC)
         self._probed_monotonic = time.monotonic()
+        ffmpeg = next((d for d in self._deps if d.id == "ffmpeg"), None)
+        self._restart_encoder_probe(ffmpeg.path if ffmpeg and ffmpeg.available else None)
+
+    def _restart_encoder_probe(self, ffmpeg_path: str | None) -> None:
+        if self._encoder_task is not None and not self._encoder_task.done():
+            self._encoder_task.cancel()
+        self._encoder_task = None
+        if ffmpeg_path is None:
+            self._encoders = EncoderResult()
+            return
+
+        async def probe() -> None:
+            self._encoders = await self._prober.probe_encoders(ffmpeg_path)
+
+        self._encoder_task = asyncio.create_task(probe())
+
+    @property
+    def encoders_checking(self) -> bool:
+        return self._encoder_task is not None and not self._encoder_task.done()
+
+    async def wait_for_encoders(self) -> None:
+        if self._encoder_task is not None:
+            with contextlib.suppress(asyncio.CancelledError):
+                await asyncio.shield(self._encoder_task)
+
+    async def close(self) -> None:
+        if self._encoder_task is not None and not self._encoder_task.done():
+            self._encoder_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError, Exception):
+                await self._encoder_task
 
     async def report(self, refresh: bool = False) -> HealthReport:
         async with self._lock:
@@ -99,6 +135,7 @@ class HealthService:
                 await self._refresh_locked()
             deps = list(self._deps or [])
             encoders = self._encoders
+            checking = self.encoders_checking
             checked_at = self._checked_at
 
         disk = None
@@ -127,7 +164,11 @@ class HealthService:
                 )
                 for d in deps
             ],
-            hardware_encoders=HardwareEncoders(listed=encoders.listed, usable=encoders.usable),
+            hardware_encoders=HardwareEncoders(
+                listed=[] if checking else encoders.listed,
+                usable=[] if checking else encoders.usable,
+                checking=checking,
+            ),
             disk=disk,
             folders=Folders(inbox=str(self._settings.inbox), outbox=str(self._settings.outbox)),
             tools=self._tool_count,

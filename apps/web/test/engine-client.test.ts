@@ -14,7 +14,7 @@ export function sampleHealth(overrides: Partial<HealthReport> = {}): HealthRepor
       { id: 'deno', name: 'Deno', required: true, available: true, version: '2.9.6', path: 'C:/x/deno.exe', neededFor: 'YouTube downloads', fix: null, detail: null },
       { id: 'pandoc', name: 'Pandoc', required: false, available: false, version: null, path: null, neededFor: 'Markdown', fix: 'winget install --id JohnMacFarlane.Pandoc -e', detail: 'Not found on PATH' },
     ],
-    hardwareEncoders: { listed: ['h264_nvenc', 'h264_qsv'], usable: ['h264_nvenc'] },
+    hardwareEncoders: { listed: ['h264_nvenc', 'h264_qsv'], usable: ['h264_nvenc'], checking: false },
     disk: { path: 'C:/Users/x/Werkbank/Outbox', freeBytes: 120 * 1024 ** 3, totalBytes: 500 * 1024 ** 3 },
     folders: { inbox: 'C:/Users/x/Werkbank/Inbox', outbox: 'C:/Users/x/Werkbank/Outbox' },
     tools: 0,

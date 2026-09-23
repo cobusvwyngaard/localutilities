@@ -58,6 +58,7 @@ def create_app(settings: Settings | None = None, health_service: HealthService |
             warmup.cancel()
             with contextlib.suppress(asyncio.CancelledError, Exception):
                 await warmup
+            await health_service.close()
 
     app = FastAPI(
         title="Werkbank engine",

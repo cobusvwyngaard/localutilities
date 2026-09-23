@@ -87,7 +87,7 @@ function DependencyRow({ dep }: { dep: DependencyStatus }) {
 
 function EngineDetails({ health, onRecheck }: { health: HealthReport; onRecheck: () => Promise<void> }) {
   const [busy, setBusy] = useState(false);
-  const { listed, usable } = health.hardwareEncoders;
+  const { listed, usable, checking } = health.hardwareEncoders;
   return (
     <>
       <section className={card} aria-labelledby="deps-title">
@@ -125,11 +125,13 @@ function EngineDetails({ health, onRecheck }: { health: HealthReport; onRecheck:
         <div>
           <h3 className="font-semibold">Hardware video encoders</h3>
           <p className="text-zinc-600 dark:text-zinc-400">
-            {usable.length > 0
-              ? `Usable: ${usable.join(', ')}`
-              : 'None usable — software encoding (slower, smaller files) will be used.'}
+            {checking
+              ? 'Checking which ones work on this computer…'
+              : usable.length > 0
+                ? `Usable: ${usable.join(', ')}`
+                : 'None usable — software encoding (slower, smaller files) will be used.'}
           </p>
-          {listed.length > usable.length && (
+          {!checking && listed.length > usable.length && (
             <p className="text-xs text-zinc-500">
               Built into FFmpeg but not usable on this hardware:{' '}
               {listed.filter((e) => !usable.includes(e)).join(', ')}

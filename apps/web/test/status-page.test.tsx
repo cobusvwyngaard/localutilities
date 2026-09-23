@@ -19,6 +19,12 @@ describe('StatusPage', () => {
     expect(screen.getByText('120 GB free of 500 GB')).toBeTruthy();
   });
 
+  it('says so while hardware encoders are still being tested', () => {
+    const health = sampleHealth({ hardwareEncoders: { listed: [], usable: [], checking: true } });
+    render(<StatusPage state={{ kind: 'connected', health }} onRecheck={noop} />);
+    expect(screen.getByText('Checking which ones work on this computer…')).toBeTruthy();
+  });
+
   it('explains browser-only mode without engine details', () => {
     render(<StatusPage state={{ kind: 'browser-only' }} onRecheck={noop} />);
     expect(screen.getByText('Browser-only mode')).toBeTruthy();

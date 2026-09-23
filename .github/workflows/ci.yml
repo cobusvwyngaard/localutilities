@@ -134,10 +134,18 @@ jobs:
           }
           if (-not $token) { throw 'The engine did not serve the UI with its token within 120 s' }
           $headers = @{ Authorization = "Bearer $token" }
+          $clock = [Diagnostics.Stopwatch]::StartNew()
           $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8765/api/health?refresh=true' -Headers $headers
+          "Dependency check answered in $($clock.Elapsed.TotalSeconds.ToString('0.0')) s"
           $health.dependencies | Format-Table id, required, available, version, path -AutoSize | Out-String -Width 250
-          "Hardware encoders usable: $($health.hardwareEncoders.usable -join ', ')"
           if ($health.status -ne 'ok') { throw "Engine status is '$($health.status)', expected 'ok'" }
+          while ($health.hardwareEncoders.checking -and $clock.Elapsed.TotalSeconds -lt 180) {
+            Start-Sleep -Seconds 2
+            $health = Invoke-RestMethod -Uri 'http://127.0.0.1:8765/api/health' -Headers $headers
+          }
+          "Hardware encoder test finished after $($clock.Elapsed.TotalSeconds.ToString('0.0')) s"
+          "Listed: $($health.hardwareEncoders.listed -join ', ')"
+          "Usable: $($health.hardwareEncoders.usable -join ', ')"
           try {
             Invoke-WebRequest -UseBasicParsing http://127.0.0.1:8765/api/health | Out-Null
             throw 'The API answered without a token'

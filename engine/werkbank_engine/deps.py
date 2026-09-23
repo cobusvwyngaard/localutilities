@@ -410,13 +410,8 @@ class DependencyProber:
                 usable.append(enc)
         return EncoderResult(listed=listed, usable=usable)
 
-    async def probe_all(self) -> tuple[list[DependencyResult], EncoderResult]:
+    async def probe_dependencies(self) -> list[DependencyResult]:
+        """Programs and Python packages (fast). Hardware encoders are probed separately (slow)."""
         programs = await asyncio.gather(*(self.probe_program(spec) for spec in PROGRAMS))
-        by_id = {r.id: r for r in programs}
-        ffmpeg = by_id["ffmpeg"]
-        encoders = (
-            await self.probe_encoders(ffmpeg.path) if ffmpeg.available and ffmpeg.path else EncoderResult()
-        )
         packages = self.probe_python_packages()
-        ordered = sorted([*programs, *packages], key=lambda r: not r.required)  # required first, stable
-        return ordered, encoders
+        return sorted([*programs, *packages], key=lambda r: not r.required)  # required first, stable

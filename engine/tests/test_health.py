@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import shutil
+import time
 from datetime import date
 
 import pytest
@@ -20,8 +21,18 @@ from werkbank_engine.deps import (
 from werkbank_engine.health import HealthService
 
 
+def _settled_health(client: TestClient, auth: dict[str, str]) -> dict:
+    """Health once the background encoder probe has finished."""
+    for _ in range(100):
+        body = client.get("/api/health", headers=auth).json()
+        if not body["hardwareEncoders"]["checking"]:
+            return body
+        time.sleep(0.02)
+    raise AssertionError("encoder probe did not finish")
+
+
 def test_health_reports_versions_encoders_and_disk(client: TestClient, auth: dict[str, str]) -> None:
-    body = client.get("/api/health", headers=auth).json()
+    body = _settled_health(client, auth)
     assert body["status"] == "ok"
     assert body["engine"]["version"]
     deps = {d["id"]: d for d in body["dependencies"]}
@@ -36,6 +47,7 @@ def test_health_reports_versions_encoders_and_disk(client: TestClient, auth: dic
     assert body["hardwareEncoders"] == {
         "listed": ["h264_nvenc", "h264_qsv", "h264_amf"],
         "usable": ["h264_nvenc"],
+        "checking": False,
     }
     assert body["disk"]["freeBytes"] > 0
     assert body["tools"] == 1
@@ -44,10 +56,19 @@ def test_health_reports_versions_encoders_and_disk(client: TestClient, auth: dic
     assert required_flags == sorted(required_flags, reverse=True)
 
 
+def _report_after_encoders(service: HealthService, refresh: bool = False):
+    async def scenario():
+        await service.report(refresh=refresh)
+        await service.wait_for_encoders()
+        return await service.report()
+
+    return asyncio.run(scenario())
+
+
 def test_missing_required_dependency_degrades_status(settings: Settings) -> None:
     fake = FakeTools({k: v for k, v in ALL_REQUIRED_PRESENT.items() if k != "deno"})
     service = HealthService(settings, tool_count=0, prober=make_prober(fake))
-    report = asyncio.run(service.report())
+    report = _report_after_encoders(service)
     assert report.status == "degraded"
     deno = next(d for d in report.dependencies if d.id == "deno")
     assert deno.available is False
@@ -57,9 +78,37 @@ def test_missing_required_dependency_degrades_status(settings: Settings) -> None
 
 def test_no_ffmpeg_means_no_encoder_probing(settings: Settings) -> None:
     fake = FakeTools({"deno": ALL_REQUIRED_PRESENT["deno"]})
-    report = asyncio.run(HealthService(settings, tool_count=0, prober=make_prober(fake)).report())
+    report = _report_after_encoders(HealthService(settings, tool_count=0, prober=make_prober(fake)))
     assert report.hardware_encoders.listed == []
+    assert report.hardware_encoders.checking is False
     assert not any("-encoders" in call for call in fake.calls)
+
+
+def test_status_does_not_wait_for_slow_encoder_probes(settings: Settings) -> None:
+    fake = FakeTools(dict(ALL_REQUIRED_PRESENT))
+    slow_run = fake.run
+
+    async def slow(args: list[str], limit_seconds: float):
+        if "-c:v" in args:
+            await asyncio.sleep(0.5)  # a GPU encoder that takes long to fail
+        return await slow_run(args, limit_seconds)
+
+    fake.run = slow  # type: ignore[method-assign]
+    service = HealthService(settings, tool_count=0, prober=make_prober(fake))
+
+    async def scenario():
+        started = time.monotonic()
+        first = await service.report()
+        elapsed = time.monotonic() - started
+        await service.wait_for_encoders()
+        return first, elapsed, await service.report()
+
+    first, elapsed, later = asyncio.run(scenario())
+    assert first.status == "ok"
+    assert first.hardware_encoders.checking is True
+    assert elapsed < 0.4
+    assert later.hardware_encoders.checking is False
+    assert later.hardware_encoders.usable == ["h264_nvenc"]
 
 
 def test_results_are_cached_until_refresh(settings: Settings) -> None:
@@ -68,10 +117,12 @@ def test_results_are_cached_until_refresh(settings: Settings) -> None:
 
     async def scenario() -> tuple[int, int, int]:
         await service.report()
+        await service.wait_for_encoders()
         first = len(fake.calls)
         await service.report()
         second = len(fake.calls)
         await service.report(refresh=True)
+        await service.wait_for_encoders()
         return first, second, len(fake.calls)
 
     first, second, third = asyncio.run(scenario())

@@ -16,7 +16,8 @@ export interface HealthReport {
   status: 'ok' | 'degraded';
   engine: { version: string; python: string; platform: string };
   dependencies: DependencyStatus[];
-  hardwareEncoders: { listed: string[]; usable: string[] };
+  /** `checking`: test encodes still running on the engine; listed/usable are empty until done. */
+  hardwareEncoders: { listed: string[]; usable: string[]; checking: boolean };
   disk: { path: string; freeBytes: number; totalBytes: number } | null;
   folders: { inbox: string; outbox: string };
   tools: number;
