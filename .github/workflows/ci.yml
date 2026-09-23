@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w apps/web
+      # Cloudflare Pages rejects any single file over 25 MiB.
+      - name: Check Pages per-file size limit
+        run: |
+          big=$(find apps/web/dist -type f -size +25M)
+          if [ -n "$big" ]; then echo "Files over 25 MiB:"; echo "$big"; exit 1; fi

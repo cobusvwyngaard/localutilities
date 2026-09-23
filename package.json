@@ -1,0 +1,15 @@
+{
+  "name": "werkbank",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "npm run build -w apps/web",
+    "typecheck": "npm run typecheck -w apps/web"
+  }
+}

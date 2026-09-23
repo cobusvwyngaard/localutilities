@@ -1,0 +1,11 @@
+# Cloudflare Pages response headers.
+# Cross-origin isolation (COOP/COEP) is deliberately NOT set: only add it if the
+# multi-threaded ffmpeg.wasm build is adopted (DESIGN.md §8).
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  X-Frame-Options: DENY
+  X-Robots-Tag: noindex, nofollow
+
+/version.json
+  Cache-Control: no-store
