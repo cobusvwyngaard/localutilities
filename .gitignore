@@ -15,3 +15,4 @@ __pycache__/
 *.wasm
 *.onnx
 *.bin
+*.tsbuildinfo
