@@ -336,6 +336,7 @@ werkbank/
 - `install.ps1` for uv + FFmpeg + Deno.
 - Cloudflare deployment working (Workers Static Assets via GitHub Actions — see §8).
 - ✅ Accept when: Mode A opens at `127.0.0.1:8765` showing 🟢 with dependency versions; Mode B loads from Cloudflare showing ⚪.
+- *Status (23 Sept 2026): implemented. Verified by CI on every push — Playwright acceptance tests (Mode A 🟢 with versions against the real engine; Mode B ⚪ with the real Cloudflare config), and a real `install.ps1` run on a fresh Windows Server 2025 runner (winget → uv, FFmpeg, Deno; engine started through `start.cmd` reports `ok`). Mode B verified on the live site. Still to confirm: a first install on the owner's own laptop.*
 
 **Phase 1 — The four requested tools on the engine**
 - Downloader, video/audio compression presets (incl. target size and hardware toggle), conversion with remux-first, PDF unlock.
