@@ -128,6 +128,8 @@ def media_server(folder: Path):
 
 
 def main() -> None:
+    # Job notes contain non-ASCII text (e.g. "→"); a redirected Windows console defaults to cp1252.
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     parser = argparse.ArgumentParser()
     parser.add_argument("app_dir", type=Path)
     parser.add_argument(
