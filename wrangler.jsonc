@@ -1,8 +1,10 @@
 // Cloudflare Workers Static Assets: serves the static UI only (DESIGN.md §8).
+// Deployed from GitHub Actions (.github/workflows/deploy.yml) on pushes to main.
 // No Worker script — there is no server-side code and no file processing on Cloudflare.
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "localutilities",
+  "account_id": "007e56c5506810c0046185978bb4d89c",
   "compatibility_date": "2026-09-01",
   "assets": {
     "directory": "./apps/web/dist",

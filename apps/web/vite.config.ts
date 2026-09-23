@@ -1,11 +1,12 @@
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
 
-// Set by Cloudflare during its build (Workers Builds: WORKERS_CI_*, Pages: CF_PAGES_*); absent locally.
+// Set by the CI that builds the deployment (GitHub Actions: GITHUB_*, Workers Builds: WORKERS_CI_*,
+// Pages: CF_PAGES_*); absent locally.
 const env = process.env;
 const build = {
-  commit: env.WORKERS_CI_COMMIT_SHA ?? env.CF_PAGES_COMMIT_SHA ?? 'local',
-  branch: env.WORKERS_CI_BRANCH ?? env.CF_PAGES_BRANCH ?? 'local',
+  commit: env.GITHUB_SHA ?? env.WORKERS_CI_COMMIT_SHA ?? env.CF_PAGES_COMMIT_SHA ?? 'local',
+  branch: env.GITHUB_REF_NAME ?? env.WORKERS_CI_BRANCH ?? env.CF_PAGES_BRANCH ?? 'local',
   builtAt: new Date().toISOString(),
 };
 
