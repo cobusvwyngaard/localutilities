@@ -56,7 +56,7 @@ def test_compress_video_from_the_inbox(
     assert job["status"] == "done", job
     assert job["progress"] == 1.0
     assert job["outputs"][0]["name"] == "clip (compressed).mp4"
-    assert "MB →" in job["notes"][0]
+    assert "B →" in job["notes"][0]  # "KB →" or "MB →"
 
 
 def test_target_size_is_respected(

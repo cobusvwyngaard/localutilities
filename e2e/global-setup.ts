@@ -18,13 +18,17 @@ export default function globalSetup(): void {
   ffmpeg([...clip(3, '320x240'), join(media, 'clip.mp4')]);
   ffmpeg([...clip(40, '1280x720'), join(media, 'long.mp4')]);
 
-  // PDFs with pikepdf from the engine's environment: owner-restricted, and user-password protected.
+  // PDFs with pikepdf from the engine's environment: owner-restricted, user-password protected, and plain.
   const script = [
     'import pikepdf, sys',
     'restricted = pikepdf.Permissions(extract=False, print_highres=False, modify_other=False)',
     'for name, user in (("restricted.pdf", ""), ("locked.pdf", "open-sesame")):',
     '    pdf = pikepdf.new(); pdf.add_blank_page()',
     '    pdf.save(sys.argv[1] + "/" + name, encryption=pikepdf.Encryption(owner="owner-pw", user=user, allow=restricted))',
+    'for name, pages in (("one.pdf", 1), ("two.pdf", 2)):',
+    '    pdf = pikepdf.new()',
+    '    for _ in range(pages): pdf.add_blank_page()',
+    '    pdf.save(sys.argv[1] + "/" + name)',
   ].join('\n');
   execFileSync('uv', ['run', '--project', 'engine', '--frozen', 'python', '-c', script, media], { stdio: 'inherit' });
 }

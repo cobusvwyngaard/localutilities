@@ -13,13 +13,14 @@ import logging
 import os
 import secrets
 import shutil
+import threading
 import time
 from collections import OrderedDict, deque
 from collections.abc import AsyncIterator, Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import ModuleType
-from typing import Any, Literal
+from typing import Any, Literal, TypeVar
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -36,6 +37,13 @@ Status = Literal["queued", "running", "done", "failed", "cancelled"]
 TERMINAL: frozenset[str] = frozenset({"done", "failed", "cancelled"})
 MAX_KEPT_JOBS = 100
 MAX_URL_LENGTH = 2048
+
+T = TypeVar("T")
+Reporter = Callable[[float | None, str | None], None]
+
+
+class ThreadStopped(Exception):
+    """Raised inside a worker thread (by its progress reporter) once the job has been cancelled."""
 
 
 class ToolError(Exception):
@@ -185,6 +193,24 @@ class ToolContext:
     def add_output(self, path: Path, name: str) -> None:
         """`path` (inside the scratch folder) becomes Outbox/`name` if the job succeeds."""
         self._pending_outputs.append((path, name))
+
+    async def in_thread(self, fn: Callable[..., T], *args: Any) -> T:
+        """Run blocking work (pikepdf, pypdfium2, ...) in a thread. `fn` gets a thread-safe
+        `report(fraction, message)` as its first argument; after a cancel, the next `report`
+        call raises ThreadStopped so the thread ends early (threads cannot be killed)."""
+        loop = asyncio.get_running_loop()
+        stop = threading.Event()
+
+        def report(fraction: float | None, message: str | None = None) -> None:
+            if stop.is_set():
+                raise ThreadStopped
+            loop.call_soon_threadsafe(self.progress, fraction, message)
+
+        try:
+            return await asyncio.to_thread(fn, report, *args)
+        except asyncio.CancelledError:
+            stop.set()
+            raise
 
     async def run(
         self,

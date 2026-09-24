@@ -38,6 +38,7 @@
     "pikepdf",
     "ghostscript",
     "tesseract",
+    "whisper",
     "libreoffice",
     "pandoc",
     "calibre"
@@ -463,6 +464,1186 @@
           "secret": true
         }
       },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "audio.transcribe",
+      "title": "Transcribe (speech to text)",
+      "description": "Turns speech in audio or video into text and subtitles with Whisper, entirely on this computer. Check names and technical terms: the transcript can contain mistakes.",
+      "category": "audio",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".mp3",
+          ".m4a",
+          ".aac",
+          ".wav",
+          ".flac",
+          ".ogg",
+          ".oga",
+          ".opus",
+          ".wma",
+          ".aiff",
+          ".aif",
+          ".amr",
+          ".mp4",
+          ".mkv",
+          ".mov",
+          ".webm",
+          ".avi",
+          ".m4v",
+          ".wmv",
+          ".flv",
+          ".mpg",
+          ".mpeg",
+          ".ts",
+          ".mts",
+          ".m2ts",
+          ".3gp"
+        ],
+        "min": 1,
+        "max": 20
+      },
+      "params": {
+        "model": {
+          "type": "enum",
+          "label": "Model",
+          "options": [
+            {
+              "value": "turbo",
+              "label": "Most accurate (large-v3-turbo), slower"
+            },
+            {
+              "value": "small",
+              "label": "Faster (small), less accurate, especially for Afrikaans"
+            }
+          ],
+          "default": "turbo"
+        },
+        "language": {
+          "type": "enum",
+          "label": "Spoken language",
+          "options": [
+            {
+              "value": "auto",
+              "label": "Detect automatically"
+            },
+            {
+              "value": "en",
+              "label": "English"
+            },
+            {
+              "value": "af",
+              "label": "Afrikaans"
+            },
+            {
+              "value": "nl",
+              "label": "Dutch"
+            },
+            {
+              "value": "de",
+              "label": "German"
+            },
+            {
+              "value": "fr",
+              "label": "French"
+            },
+            {
+              "value": "pt",
+              "label": "Portuguese"
+            },
+            {
+              "value": "es",
+              "label": "Spanish"
+            }
+          ],
+          "default": "auto"
+        },
+        "format": {
+          "type": "enum",
+          "label": "Output",
+          "options": [
+            {
+              "value": "all",
+              "label": "Text, SRT and VTT subtitles"
+            },
+            {
+              "value": "txt",
+              "label": "Text only (TXT)"
+            },
+            {
+              "value": "srt",
+              "label": "Subtitles (SRT)"
+            },
+            {
+              "value": "vtt",
+              "label": "Subtitles for the web (VTT)"
+            }
+          ],
+          "default": "all"
+        }
+      },
+      "requires": [
+        "whisper",
+        "ffmpeg",
+        "ffprobe"
+      ]
+    },
+    {
+      "id": "pdf.merge",
+      "title": "Merge PDFs",
+      "description": "Combine PDFs into one, in the order you added them.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 2,
+        "max": 200
+      },
+      "params": {
+        "bookmarks": {
+          "type": "boolean",
+          "label": "Add a bookmark for each file",
+          "default": true
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.split",
+      "title": "Split PDF",
+      "description": "Split into single pages, into parts of N pages, or by page ranges. The parts come in one ZIP file.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "mode": {
+          "type": "enum",
+          "label": "Split",
+          "options": [
+            {
+              "value": "pages",
+              "label": "Every page into its own PDF"
+            },
+            {
+              "value": "chunks",
+              "label": "Every N pages"
+            },
+            {
+              "value": "ranges",
+              "label": "By page ranges (one PDF per range)"
+            }
+          ],
+          "default": "pages"
+        },
+        "chunk": {
+          "type": "number",
+          "label": "Pages per part (for \"every N pages\")",
+          "min": 1,
+          "max": 10000,
+          "default": 10,
+          "integer": true
+        },
+        "ranges": {
+          "type": "text",
+          "label": "Page ranges (for \"by page ranges\")",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 4-10, 11-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.pages",
+      "title": "Select, reorder or delete pages",
+      "description": "Keep only some pages (in the order you type them) or delete pages.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "action": {
+          "type": "enum",
+          "label": "Action",
+          "options": [
+            {
+              "value": "keep",
+              "label": "Keep these pages, in this order"
+            },
+            {
+              "value": "delete",
+              "label": "Delete these pages"
+            }
+          ],
+          "default": "keep"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 3, 1-2, 10-5"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.rotate",
+      "title": "Rotate pages",
+      "description": "Turn all pages or selected pages.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "angle": {
+          "type": "enum",
+          "label": "Rotate",
+          "options": [
+            {
+              "value": "90",
+              "label": "90° clockwise"
+            },
+            {
+              "value": "180",
+              "label": "180°"
+            },
+            {
+              "value": "270",
+              "label": "90° anticlockwise"
+            }
+          ],
+          "default": "90"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.compress",
+      "title": "Compress PDF",
+      "description": "Make PDFs smaller. Lossless only reorganises the file; the other levels also shrink and re-compress large photos.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "level": {
+          "type": "enum",
+          "label": "Level",
+          "options": [
+            {
+              "value": "lossless",
+              "label": "Lossless (no quality change, smaller gain)"
+            },
+            {
+              "value": "balanced",
+              "label": "Balanced: photos up to 2000 px, good quality"
+            },
+            {
+              "value": "strong",
+              "label": "Strong: photos up to 1200 px, for e-mail"
+            }
+          ],
+          "default": "balanced"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.protect",
+      "title": "Protect PDF with a password",
+      "description": "Encrypt with AES-256 so the PDF needs a password to open, and optionally restrict printing, copying and editing.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "password": {
+          "type": "text",
+          "label": "Password to open the PDF",
+          "maxLength": 256,
+          "default": "",
+          "secret": true
+        },
+        "allowPrint": {
+          "type": "boolean",
+          "label": "Allow printing",
+          "default": true
+        },
+        "allowCopy": {
+          "type": "boolean",
+          "label": "Allow copying text and images",
+          "default": false
+        },
+        "allowEdit": {
+          "type": "boolean",
+          "label": "Allow editing and form filling",
+          "default": false
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.clean-metadata",
+      "title": "Remove PDF metadata",
+      "description": "Removes the author, title, software, dates and other hidden document information.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {},
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.to-images",
+      "title": "PDF to images",
+      "description": "Save pages as PNG or JPG images (in a ZIP file when there is more than one page).",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 20
+      },
+      "params": {
+        "format": {
+          "type": "enum",
+          "label": "Image format",
+          "options": [
+            {
+              "value": "png",
+              "label": "PNG (sharp text, larger)"
+            },
+            {
+              "value": "jpg",
+              "label": "JPG (photos, smaller)"
+            }
+          ],
+          "default": "png"
+        },
+        "dpi": {
+          "type": "number",
+          "label": "Resolution",
+          "min": 50,
+          "max": 600,
+          "default": 150,
+          "integer": true,
+          "unit": "dpi"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.from-images",
+      "title": "Images to PDF",
+      "description": "Combine images into one PDF, one image per page, in the order you added them. JPG photos are not re-compressed.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".jpg",
+          ".jpeg",
+          ".png",
+          ".tif",
+          ".tiff",
+          ".webp",
+          ".bmp",
+          ".gif"
+        ],
+        "min": 1,
+        "max": 500
+      },
+      "params": {
+        "pageSize": {
+          "type": "enum",
+          "label": "Page size",
+          "options": [
+            {
+              "value": "image",
+              "label": "Same as each image"
+            },
+            {
+              "value": "a4",
+              "label": "A4 (image fitted with a margin)"
+            },
+            {
+              "value": "letter",
+              "label": "US Letter (image fitted with a margin)"
+            }
+          ],
+          "default": "a4"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.to-text",
+      "title": "PDF to text",
+      "description": "Extract the text of a PDF into a TXT file. Scanned pages have no text: run OCR first.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.tables",
+      "title": "Extract tables",
+      "description": "Find tables in a PDF and save them as a spreadsheet (one sheet per table) or CSV files. Check the result: table detection is not perfect.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "format": {
+          "type": "enum",
+          "label": "Save as",
+          "options": [
+            {
+              "value": "xlsx",
+              "label": "Excel workbook (XLSX)"
+            },
+            {
+              "value": "csv",
+              "label": "CSV files (in a ZIP file)"
+            }
+          ],
+          "default": "xlsx"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.page-numbers",
+      "title": "Add page numbers",
+      "description": "Print page numbers on the pages.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "position": {
+          "type": "enum",
+          "label": "Position",
+          "options": [
+            {
+              "value": "bottom-centre",
+              "label": "Bottom centre"
+            },
+            {
+              "value": "bottom-right",
+              "label": "Bottom right"
+            },
+            {
+              "value": "bottom-left",
+              "label": "Bottom left"
+            },
+            {
+              "value": "top-centre",
+              "label": "Top centre"
+            },
+            {
+              "value": "top-right",
+              "label": "Top right"
+            },
+            {
+              "value": "top-left",
+              "label": "Top left"
+            }
+          ],
+          "default": "bottom-centre"
+        },
+        "style": {
+          "type": "enum",
+          "label": "Style",
+          "options": [
+            {
+              "value": "n",
+              "label": "1"
+            },
+            {
+              "value": "page-n",
+              "label": "Page 1"
+            },
+            {
+              "value": "n-of-total",
+              "label": "1 of 12"
+            },
+            {
+              "value": "page-n-of-total",
+              "label": "Page 1 of 12"
+            }
+          ],
+          "default": "n"
+        },
+        "start": {
+          "type": "number",
+          "label": "First number",
+          "min": 0,
+          "max": 100000,
+          "default": 1,
+          "integer": true
+        },
+        "fontSize": {
+          "type": "number",
+          "label": "Text size",
+          "min": 6,
+          "max": 36,
+          "default": 10,
+          "integer": true,
+          "unit": "pt"
+        },
+        "skipFirst": {
+          "type": "boolean",
+          "label": "No number on the first page (cover)",
+          "default": false
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.watermark",
+      "title": "Add a watermark or stamp",
+      "description": "Put text such as DRAFT or CONFIDENTIAL across or on top of the pages.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "text": {
+          "type": "text",
+          "label": "Text",
+          "maxLength": 80,
+          "default": "CONFIDENTIAL"
+        },
+        "placement": {
+          "type": "enum",
+          "label": "Placement",
+          "options": [
+            {
+              "value": "diagonal",
+              "label": "Large, diagonally across the page"
+            },
+            {
+              "value": "top",
+              "label": "Top of the page"
+            },
+            {
+              "value": "bottom",
+              "label": "Bottom of the page"
+            }
+          ],
+          "default": "diagonal"
+        },
+        "opacity": {
+          "type": "number",
+          "label": "Opacity",
+          "min": 5,
+          "max": 100,
+          "default": 25,
+          "integer": true,
+          "unit": "%"
+        },
+        "fontSize": {
+          "type": "number",
+          "label": "Text size",
+          "min": 8,
+          "max": 200,
+          "default": 60,
+          "integer": true,
+          "unit": "pt"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.ocr",
+      "title": "OCR: make scanned PDFs searchable",
+      "description": "Recognises the text on scanned pages and adds it as an invisible layer, so you can search, select and copy it. Pages that already have text are left as they are.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 20
+      },
+      "params": {
+        "language": {
+          "type": "enum",
+          "label": "Language of the text",
+          "options": [
+            {
+              "value": "eng",
+              "label": "English"
+            },
+            {
+              "value": "afr",
+              "label": "Afrikaans"
+            },
+            {
+              "value": "eng+afr",
+              "label": "English and Afrikaans"
+            }
+          ],
+          "default": "eng"
+        },
+        "dpi": {
+          "type": "number",
+          "label": "Scan resolution used for recognition",
+          "min": 150,
+          "max": 400,
+          "default": 300,
+          "integer": true,
+          "unit": "dpi"
+        }
+      },
+      "requires": [
+        "tesseract",
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.redact",
+      "title": "Redact (black out) text",
+      "description": "Permanently blacks out words or phrases. Pages with a match are turned into images so the hidden text cannot be recovered; their other text is then no longer selectable (run OCR afterwards if you need it).",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "terms": {
+          "type": "text",
+          "label": "Words or phrases to black out (separate with ;)",
+          "maxLength": 2000,
+          "default": "",
+          "placeholder": "e.g. 8001015009087; Jane Doe"
+        },
+        "caseSensitive": {
+          "type": "boolean",
+          "label": "Match upper and lower case exactly",
+          "default": false
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.sign",
+      "title": "Sign PDF digitally",
+      "description": "Adds a digital signature with your certificate (a .p12 or .pfx file), so readers can see who signed and that the document was not changed afterwards. Add the PDF and the certificate file.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf",
+          ".p12",
+          ".pfx"
+        ],
+        "min": 2,
+        "max": 2
+      },
+      "params": {
+        "password": {
+          "type": "text",
+          "label": "Certificate password",
+          "maxLength": 1024,
+          "default": "",
+          "secret": true
+        },
+        "reason": {
+          "type": "text",
+          "label": "Reason (optional)",
+          "maxLength": 200,
+          "default": "",
+          "placeholder": "e.g. Approved"
+        },
+        "location": {
+          "type": "text",
+          "label": "Location (optional)",
+          "maxLength": 200,
+          "default": "",
+          "placeholder": "e.g. Stellenbosch"
+        },
+        "visible": {
+          "type": "boolean",
+          "label": "Show a signature box on the last page",
+          "default": true
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.flatten",
+      "title": "Flatten forms and annotations",
+      "description": "Makes filled-in form fields, comments and stamps part of the page, so they can no longer be changed.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {},
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.repair",
+      "title": "Repair PDF",
+      "description": "Rebuilds damaged PDFs that will not open or show errors, where the damage allows.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {},
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.info",
+      "title": "PDF information",
+      "description": "A report on pages, page sizes, fonts, images, text, security, forms, signatures, attachments and metadata.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {},
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.extract",
+      "title": "Extract images or attachments",
+      "description": "Save the images or the attached files inside a PDF, in their original quality (in a ZIP file).",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "what": {
+          "type": "enum",
+          "label": "Extract",
+          "options": [
+            {
+              "value": "images",
+              "label": "Images"
+            },
+            {
+              "value": "attachments",
+              "label": "Attached files"
+            }
+          ],
+          "default": "images"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.layout",
+      "title": "Pages per sheet, booklet or resize",
+      "description": "Put 2 or 4 pages on each sheet, make a booklet for folding, or fit every page to one paper size.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "layout": {
+          "type": "enum",
+          "label": "Layout",
+          "options": [
+            {
+              "value": "1",
+              "label": "1 page per sheet (resize to the paper size)"
+            },
+            {
+              "value": "2",
+              "label": "2 pages per sheet"
+            },
+            {
+              "value": "4",
+              "label": "4 pages per sheet"
+            },
+            {
+              "value": "booklet",
+              "label": "Booklet (print double-sided, fold in the middle)"
+            }
+          ],
+          "default": "2"
+        },
+        "paper": {
+          "type": "enum",
+          "label": "Paper",
+          "options": [
+            {
+              "value": "a4",
+              "label": "A4"
+            },
+            {
+              "value": "a3",
+              "label": "A3"
+            },
+            {
+              "value": "letter",
+              "label": "US Letter"
+            }
+          ],
+          "default": "a4"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.crop",
+      "title": "Crop margins",
+      "description": "Trim the edges of pages, for example to remove scanner borders.",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 1,
+        "max": 50
+      },
+      "params": {
+        "top": {
+          "type": "number",
+          "label": "Top",
+          "min": 0,
+          "max": 300,
+          "default": 10,
+          "unit": "mm"
+        },
+        "bottom": {
+          "type": "number",
+          "label": "Bottom",
+          "min": 0,
+          "max": 300,
+          "default": 10,
+          "unit": "mm"
+        },
+        "left": {
+          "type": "number",
+          "label": "Left",
+          "min": 0,
+          "max": 300,
+          "default": 10,
+          "unit": "mm"
+        },
+        "right": {
+          "type": "number",
+          "label": "Right",
+          "min": 0,
+          "max": 300,
+          "default": 10,
+          "unit": "mm"
+        },
+        "pages": {
+          "type": "text",
+          "label": "Pages (empty = all pages)",
+          "maxLength": 500,
+          "default": "",
+          "placeholder": "e.g. 1-3, 5, 8-"
+        }
+      },
+      "requires": [
+        "pikepdf"
+      ]
+    },
+    {
+      "id": "pdf.compare",
+      "title": "Compare two PDFs",
+      "description": "Shows the differences in the text of two PDFs side by side (a web page you can open in the browser).",
+      "category": "pdf",
+      "runsIn": [
+        "engine"
+      ],
+      "inputs": {
+        "kinds": [
+          "file"
+        ],
+        "accept": [
+          ".pdf"
+        ],
+        "min": 2,
+        "max": 2
+      },
+      "params": {},
       "requires": [
         "pikepdf"
       ]

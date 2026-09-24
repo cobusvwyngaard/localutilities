@@ -1,5 +1,7 @@
 # Werkbank — local-first utilities suite
-*Design document, v0.3 — 23 September 2026. "Werkbank" is a placeholder name.*
+*Design document, v0.4 — 24 September 2026. "Werkbank" is a placeholder name.*
+
+*v0.4: transcription (whisper.cpp with the small and large-v3-turbo models, both bundled, chosen per job) and the full PDF tool set (§4.0), all in the portable app. OCR uses Tesseract directly, without Ghostscript or OCRmyPDF. The zip grows to about 1 GB.*
 
 *v0.3 (owner's decision): **nothing is installed on the laptop.** The engine ships as a portable Windows app — a zip with `Werkbank.exe`, its own Python, FFmpeg, FFprobe, Deno and the standalone yt-dlp — that runs without an installer, administrator rights, winget or PATH changes (§6.3). The winget installer and start scripts are gone. Processing happens in the portable app only; browser-side processing (Mode B tools, Phase 2 browser path) is dropped, and the hosted site serves the UI and the download link.*
 
@@ -98,7 +100,21 @@ Routing rule in the UI:
 
 ## 4. Feature catalogue
 
-Phase numbers refer to §9. **E** = engine (native), **B** = browser.
+Phase numbers refer to §9. **E** = engine (native), **B** = browser (dropped in v0.3: everything runs in the portable app).
+
+### 4.0 Built (v0.4)
+
+| Area | Tools (registry id) | How |
+|---|---|---|
+| Media | `download.media`, `video.compress`, `video.convert`, `audio.compress`, `audio.convert` | yt-dlp, FFmpeg (§5) |
+| Transcription | `audio.transcribe`: TXT, SRT, VTT; model *small* (fast) or *large-v3-turbo* (accurate); language auto/en/af/… | FFmpeg → 16 kHz WAV → whisper.cpp 1.9.2 with Silero VAD (skips silence, keeps the original timeline) |
+| PDF pages | `pdf.merge` (bookmark per file), `pdf.split` (pages, every N, ranges → ZIP), `pdf.pages` (keep in order / delete), `pdf.rotate`, `pdf.crop` (margins as displayed), `pdf.layout` (resize, 2 or 4 per sheet, booklet) | pikepdf; lossless |
+| PDF content | `pdf.page-numbers`, `pdf.watermark`, `pdf.compress` (lossless / balanced / strong), `pdf.flatten`, `pdf.repair` | pikepdf, reportlab overlays (upright on rotated pages), Pillow |
+| PDF conversion | `pdf.to-images`, `pdf.from-images` (JPEG kept as is), `pdf.to-text`, `pdf.tables` (XLSX or CSV) | PDFium (pypdfium2), img2pdf, pdfplumber, openpyxl |
+| PDF security | `pdf.unlock`, `pdf.protect` (AES-256, permissions), `pdf.clean-metadata`, `pdf.redact` (true redaction, verified), `pdf.sign` (PAdES with the user's .p12/.pfx; offline) | pikepdf, PDFium, pyHanko |
+| PDF analysis | `pdf.ocr` (eng, afr, eng+afr), `pdf.info`, `pdf.extract` (images, attachments), `pdf.compare` (HTML text diff) | Tesseract 5.4 (text-only PDF layer over the untouched page), pikepdf, difflib |
+
+Not built, and why: **PDF → Word** (the usable libraries are AGPL, e.g. PyMuPDF), **Office/HTML → PDF** (needs LibreOffice, several hundred MB), **PDF/A validation** (veraPDF needs Java), **filling PDF forms** (needs a field-by-field form UI; flattening is built), **greyscale conversion** (needs Ghostscript).
 
 ### 4.1 Requested
 
@@ -119,7 +135,7 @@ Phase numbers refer to §9. **E** = engine (native), **B** = browser.
 | Join / concatenate | Concat demuxer when codecs match, else re-encode | ✅ | ⚠️ | 3 |
 | Loudness normalisation | EBU R128 `loudnorm`, two-pass, default −16 LUFS (spoken word) | ✅ | ❌ | 2 |
 | Noise reduction for recordings | ffmpeg `afftdn` (simple) or `arnndn` (RNNoise model) | ✅ | ❌ | 3 |
-| **Transcription** → TXT / SRT / VTT / DOCX | faster-whisper locally; supports English and Afrikaans among others — test quality for other South African languages before relying on it | ✅ | ❌ | 3 |
+| **Transcription** → TXT / SRT / VTT | **Built (v0.4)** with whisper.cpp instead of faster-whisper (no PyTorch/CTranslate2 in the frozen app); English and Afrikaans among others — test quality for other South African languages before relying on it. DOCX output not built. | ✅ | ❌ | 2 |
 | Speaker labels (diarisation) | pyannote; needs a Hugging Face token and accepting the model licence — optional | ✅ | ❌ | 4 |
 | Subtitles: embed or burn in | Soft-sub into MP4/MKV, or hard-burn | ✅ | ⚠️ | 3 |
 | Split long recordings | By duration or detected silence | ✅ | ❌ | 3 |
@@ -275,12 +291,18 @@ Using the Python library (rather than the `qpdf` CLI) keeps the password out of 
 
 **v0.3: bundled in the portable app, not installed.** `scripts/portable/build.py` (run by CI on Windows) freezes the engine with PyInstaller (one folder: `Werkbank.exe` + `_internal/` with Python, the engine's packages, the built UI and `tools.json`) and adds `bin/` with programs pinned by version **and SHA-256** in `scripts/portable/programs.json`. The engine looks in `bin/` before PATH (`werkbank_engine/runtime.py`). Settings stay in `%APPDATA%\Werkbank`, Inbox/Outbox in `%USERPROFILE%\Werkbank`; nothing needs administrator rights. On `main`, CI publishes the zip as a GitHub release (`build-<run number>`); the hosted site links to the latest.
 
-| Bundled (Phase 1) | Source | Licence |
+| Bundled | Source | Licence |
 |---|---|---|
 | FFmpeg + FFprobe 9.0.2 | gyan.dev "essentials" build (x264, x265, Opus, Vorbis, LAME, NVENC, QSV, AMF) | GPL-3.0 |
 | Deno 2.9.6 | Official release zip | MIT |
 | yt-dlp (standalone `yt-dlp.exe`) | Official release; includes yt-dlp-ejs; updates itself (`--update` checks the published SHA-256) | Unlicense |
-| Python 3.12, FastAPI, Uvicorn, pikepdf (qpdf) | Frozen into `_internal/` | Various open source |
+| whisper.cpp 1.9.2 (`bin/whisper/`) | Official `whisper-bin-x64.zip` (CPU; picks AVX2/AVX-512 code at run time) | MIT |
+| Visual C++ runtime DLLs (`bin/whisper/`) | Microsoft redistributables from the `msvc-runtime` wheel; whisper.cpp needs them and a clean Windows may not have them | Microsoft REDIST terms |
+| Whisper models small (q5_1, 190 MB) and large-v3-turbo (q5_0, 574 MB); Silero VAD v6.2.0 (`bin/models/`) | Hugging Face, pinned to a commit | MIT |
+| Tesseract 5.4.0 (`bin/tesseract/`) + eng, osd, afr (tessdata_best) | UB Mannheim Windows installer, **unpacked with 7-Zip at build time, never run**; only the 26 DLLs tesseract.exe imports | Apache-2.0 (+ bundled libraries' licences) |
+| Python 3.12, FastAPI, Uvicorn, pikepdf (qpdf), pypdfium2 (PDFium), reportlab, pdfplumber, img2pdf, pyHanko, openpyxl, Pillow | Frozen into `_internal/` | Various open source |
+
+The build fails if any bundled `.exe`/`.dll` imports a DLL that is neither bundled next to it nor part of Windows (`check_windows_imports` in `build.py`): CI runners have the Visual C++ runtime installed, a clean laptop may not.
 
 Later-phase programs must also run from `bin/` without installation, or the tool does not ship. The original v0.2 list (installed with winget) is kept below for reference:
 
@@ -362,6 +384,7 @@ werkbank/
 - *Status (23 Sept 2026): built. Verified in CI through the real UI and engine: live progress over SSE and a clean cancel (40-second clip, not 1 h), remux-first conversion, target-size compression within the target, PDF unlock of both kinds (the password is never echoed back), and yt-dlp downloading from a web server; the engine test suite also runs on Windows. **Not yet verified: YouTube** — YouTube refuses cloud/CI addresses ("Sign in to confirm you're not a bot"), so the MP4/M4A download must be confirmed on the owner's laptop.*
 
 **Phase 2 — First additions (in the portable app)**
+- *Status (24 Sept 2026): the full PDF set and transcription (brought forward from Phase 3) are built — §4.0. Verified by engine tests on Linux and Windows (real pikepdf, PDFium, Tesseract, whisper.cpp, pyHanko) and by the smoke test of the frozen app (transcription with both models, OCR, signing, tables, redaction, …). Still to do: image tools, QR codes, trim/extract audio, loudness normalisation.*
 - PDF page tools, image tools, QR codes, metadata stripping, loudness normalisation, trim/extract audio; PDF compression only if a Ghostscript (AGPL) or alternative can run from `bin/` without installation.
 - ~~Browser path (Mediabunny, qpdf-wasm) and Mode B → engine connection~~ — dropped in v0.3 (processing in the portable app only).
 - ✅ Accept when: each new tool works in the portable app on a clean Windows machine with nothing installed.

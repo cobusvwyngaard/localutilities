@@ -125,8 +125,10 @@ async def run_ffmpeg(
 
 
 def describe_size_change(before: int, after: int) -> str:
+    small = max(before, after) < 1_048_576
+
     def mb(n: int) -> str:
-        return f"{n / 1_048_576:.1f} MB"
+        return f"{n / 1024:.0f} KB" if small else f"{n / 1_048_576:.1f} MB"
 
     if before <= 0:
         return mb(after)

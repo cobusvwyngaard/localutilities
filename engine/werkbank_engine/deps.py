@@ -47,6 +47,7 @@ class ProgramSpec:
 # The portable app ships these programs; if one is missing its download is incomplete.
 PORTABLE_FIX = "Download the Werkbank portable app again and extract the whole zip file"
 DEV_PYTHON_FIX = "In the repository: uv sync --project engine"
+BUNDLE_SUBDIRS = ("whisper", "tesseract")  # bin/<name>: programs that carry their own DLLs
 
 PROGRAMS: tuple[ProgramSpec, ...] = (
     ProgramSpec(
@@ -111,9 +112,10 @@ PROGRAMS: tuple[ProgramSpec, ...] = (
     ),
     ProgramSpec(
         id="tesseract",
+        bundled=True,
         name="Tesseract OCR",
         required=False,
-        needed_for="OCR of scanned PDFs (phase 3)",
+        needed_for="OCR: scanned PDFs to searchable PDFs",
         executables={"windows": ("tesseract",), "darwin": ("tesseract",), "linux": ("tesseract",)},
         version_args=("--version",),
         version_pattern=r"tesseract v?(\d+\.\d+(?:\.\d+)?)",
@@ -121,6 +123,21 @@ PROGRAMS: tuple[ProgramSpec, ...] = (
             "windows": "winget install --id UB-Mannheim.TesseractOCR -e",
             "darwin": "brew install tesseract tesseract-lang",
             "linux": "sudo apt install tesseract-ocr tesseract-ocr-afr",
+        },
+    ),
+    ProgramSpec(
+        id="whisper",
+        bundled=True,
+        name="whisper.cpp",
+        required=False,
+        needed_for="Transcription (speech to text)",
+        executables={"windows": ("whisper-cli",), "darwin": ("whisper-cli",), "linux": ("whisper-cli",)},
+        version_args=("--version",),
+        version_pattern=r"whisper\.cpp version: (\S+)",
+        fix={
+            "windows": "Build whisper.cpp v1.9.2 (whisper-cli) and put it on PATH",
+            "darwin": "brew install whisper-cpp",
+            "linux": "Build whisper.cpp v1.9.2 (whisper-cli) and put it on PATH",
         },
     ),
     ProgramSpec(
@@ -330,8 +347,12 @@ class DependencyProber:
 
     def _locate_bundled(self, names: tuple[str, ...]) -> str | None:
         if self.bundled_dir and self.bundled_dir.is_dir():
+            # bin/ itself, then the program folders that carry their own DLLs.
+            search = os.pathsep.join(
+                str(d) for d in (self.bundled_dir, *(self.bundled_dir / s for s in BUNDLE_SUBDIRS))
+            )
             for name in names:
-                found = shutil.which(name, path=str(self.bundled_dir))
+                found = shutil.which(name, path=search)
                 if found:
                     return found
         return None

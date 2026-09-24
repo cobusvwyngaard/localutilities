@@ -24,13 +24,22 @@ import tempfile
 import threading
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from pathlib import Path
 
 import pikepdf
 
 EXE = ".exe" if sys.platform == "win32" else ""
-BUNDLED = ("ffmpeg", "ffprobe", "deno", "yt-dlp")
+BUNDLED = {
+    "ffmpeg": "bin",
+    "ffprobe": "bin",
+    "deno": "bin",
+    "yt-dlp": "bin",
+    "whisper": "whisper",
+    "tesseract": "tesseract",
+}
+JFK = Path(__file__).resolve().parents[2] / "engine" / "tests" / "fixtures" / "jfk.wav"
 
 
 def free_port() -> int:
@@ -71,8 +80,17 @@ class Engine:
             time.sleep(0.5)
         raise AssertionError("Werkbank did not serve its UI in time")
 
+    def output_text(self, job: dict, index: int) -> str:
+        req = urllib.request.Request(  # noqa: S310 - http://127.0.0.1
+            f"{self.base}/api/jobs/{job['id']}/outputs/{index}",
+            headers={"Authorization": f"Bearer {self.token}"},
+        )
+        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 - http://127.0.0.1
+            return resp.read().decode("utf-8", errors="replace")
+
     def upload(self, path: Path) -> str:
-        return self.request("POST", f"/api/files?name={path.name}", path.read_bytes())["fileId"]
+        name = urllib.parse.quote(path.name)
+        return self.request("POST", f"/api/files?name={name}", path.read_bytes())["fileId"]
 
     def job(self, tool: str, inputs: list[dict], params: dict | None = None) -> dict:
         body = json.dumps({"tool": tool, "params": params or {}, "inputs": inputs}).encode()
@@ -110,6 +128,74 @@ def make_restricted_pdf(folder: Path) -> Path:
         encryption=pikepdf.Encryption(
             owner="owner-secret", user="", allow=pikepdf.Permissions(extract=False)
         ),
+    )
+    return path
+
+
+def make_sample_pdf(folder: Path) -> Path:
+    from reportlab.pdfgen.canvas import Canvas
+
+    path = folder / "sample.pdf"
+    canvas = Canvas(str(path))
+    canvas.setFont("Helvetica", 16)
+    canvas.drawString(72, 760, "Werkbank smoke test: the quick brown fox")
+    rows = [["Name", "Mark"], ["Anna", "71"], ["Ben", "64"]]
+    for r, row in enumerate(rows):
+        for c, cell in enumerate(row):
+            canvas.drawString(78 + c * 150, 684 - r * 24, cell)
+    for r in range(4):
+        canvas.line(72, 700 - r * 24, 372, 700 - r * 24)
+    for c in range(3):
+        canvas.line(72 + c * 150, 700, 72 + c * 150, 628)
+    canvas.showPage()
+    canvas.drawString(72, 760, "Second page")
+    canvas.showPage()
+    canvas.save()
+    return path
+
+
+def make_scan(sample: Path, folder: Path) -> Path:
+    """Page 1 of the sample as a 300 dpi image-only PDF (what a scanner produces)."""
+    import img2pdf
+    import pypdfium2 as pdfium
+
+    doc = pdfium.PdfDocument(sample)
+    image = doc[0].render(scale=300 / 72).to_pil().convert("L")
+    doc.close()
+    png = folder / "scan.png"
+    image.save(png, dpi=(300, 300))
+    scan = folder / "scan.pdf"
+    scan.write_bytes(img2pdf.convert(str(png)))
+    return scan
+
+
+def make_certificate(folder: Path, password: str) -> Path:
+    import datetime
+
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from cryptography.x509.oid import NameOID
+
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "Smoke Test")])
+    now = datetime.datetime.now(datetime.UTC)
+    cert = (
+        x509.CertificateBuilder()
+        .subject_name(name)
+        .issuer_name(name)
+        .public_key(key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - datetime.timedelta(days=1))
+        .not_valid_after(now + datetime.timedelta(days=7))
+        .sign(key, hashes.SHA256())
+    )
+    path = folder / "me.p12"
+    path.write_bytes(
+        pkcs12.serialize_key_and_certificates(
+            b"smoke", key, cert, None, serialization.BestAvailableEncryption(password.encode())
+        )
     )
     return path
 
@@ -169,8 +255,10 @@ def main() -> None:
             print(f"  {dep['id']:<12} {mark} {dep['version'] or ''} {where}")
         assert health["status"] == "ok", health["status"]
         deps = {d["id"]: d for d in health["dependencies"]}
-        for dep_id in BUNDLED:
-            assert Path(deps[dep_id]["path"]).parent == bin_dir, (
+        for dep_id, folder in BUNDLED.items():
+            expected = bin_dir if folder == "bin" else bin_dir / folder
+            assert deps[dep_id]["available"], f"{dep_id} is not available: {deps[dep_id]['detail']}"
+            assert Path(deps[dep_id]["path"]).parent == expected, (
                 f"{dep_id} not from the bundle: {deps[dep_id]['path']}"
             )
         assert deps["pikepdf"]["available"], "pikepdf missing from the bundle"
@@ -187,6 +275,33 @@ def main() -> None:
         with media_server(media) as base:
             downloaded = engine.job("download.media", [{"url": f"{base}/clip.mp4"}])
         assert downloaded["outputs"], "download produced no file"
+
+        # Transcription with both bundled models (the recording is 11 s of JFK, public domain).
+        for model in ("small", "turbo"):
+            job = engine.job(
+                "audio.transcribe", [{"fileId": engine.upload(JFK)}], {"model": model, "format": "txt"}
+            )
+            text = engine.output_text(job, 0).lower()
+            assert "ask not what your country" in text, (model, text)
+
+        # PDF tools that load native code or data files in the frozen app.
+        sample = make_sample_pdf(media)
+        engine.job("pdf.merge", [{"fileId": engine.upload(sample)}, {"fileId": engine.upload(sample)}])
+        engine.job("pdf.page-numbers", [{"fileId": engine.upload(sample)}])
+        engine.job("pdf.to-images", [{"fileId": engine.upload(sample)}], {"dpi": 72})
+        engine.job("pdf.to-text", [{"fileId": engine.upload(sample)}])
+        engine.job("pdf.tables", [{"fileId": engine.upload(sample)}])
+        engine.job("pdf.compress", [{"fileId": engine.upload(sample)}], {"level": "strong"})
+        engine.job("pdf.redact", [{"fileId": engine.upload(sample)}], {"terms": "Anna"})
+        engine.job("pdf.info", [{"fileId": engine.upload(sample)}])
+        cert = make_certificate(media, "smoke-pass")
+        engine.job(
+            "pdf.sign",
+            [{"fileId": engine.upload(sample)}, {"fileId": engine.upload(cert)}],
+            {"password": "smoke-pass"},
+        )
+        ocr = engine.job("pdf.ocr", [{"fileId": engine.upload(make_scan(sample, media))}])
+        assert "recognised text on 1 page" in ocr["notes"][0], ocr["notes"]
 
         if args.update_ytdlp:
             result = engine.request("POST", "/api/admin/update-ytdlp")

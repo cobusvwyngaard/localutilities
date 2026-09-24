@@ -95,3 +95,13 @@ test('the hosted site explains that tools need the engine', async ({ page }) => 
   await expect(page.getByRole('button', { name: 'Start' })).toBeDisabled();
   await expect(page.getByRole('heading', { name: 'Jobs' })).toHaveCount(0);
 });
+
+test('PDF merge: several files in the order added, one result', async ({ page }) => {
+  await openTool(page, 'pdf.merge');
+  await page.locator('input[type=file]').setInputFiles([media('two.pdf'), media('one.pdf')]);
+  await page.getByRole('button', { name: 'Start' }).click();
+  const job = latestJob(page);
+  await expect(job).toHaveAttribute('data-status', 'done');
+  await expect(job).toContainText('Merged 2 files into one PDF of 3 pages.');
+  await expect(job).toContainText('two (merged).pdf');
+});

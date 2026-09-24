@@ -6,6 +6,9 @@ The portable app (DESIGN.md §6.3) is a PyInstaller folder:
       Werkbank.exe      the engine
       _internal/        Python, the engine's packages, the built UI and tools.json
       bin/              ffmpeg, ffprobe, deno and the standalone yt-dlp
+      bin/whisper/      whisper.cpp (whisper-cli and its DLLs)
+      bin/tesseract/    Tesseract OCR with its DLLs and tessdata
+      bin/models/       Whisper speech models and the Silero VAD model
 
 Nothing is installed: no admin rights, no PATH changes, no Python or Node.js on the machine.
 """
@@ -49,3 +52,11 @@ def ytdlp_executable(env: Mapping[str, str] = os.environ) -> Path | None:
         if candidate.is_file():
             return candidate
     return None
+
+
+def models_dir(env: Mapping[str, str] = os.environ) -> Path | None:
+    """Speech models: `WERKBANK_MODELS` (development and tests), else the portable app's bin/models."""
+    if env.get("WERKBANK_MODELS"):
+        return Path(env["WERKBANK_MODELS"])
+    root = programs_dir(env)
+    return root / "models" if root is not None else None

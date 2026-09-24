@@ -20,6 +20,7 @@ concurrency:
 env:
   UV_VERSION: '0.12.18'
   DENO_VERSION: '2.9.6'
+  WHISPER_CPP_VERSION: 'v1.9.2'
 
 jobs:
   web:
@@ -52,11 +53,34 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: pipx install "uv==${UV_VERSION}"
-      - name: Install FFmpeg and Deno (the tool tests run the real programs)
+      - name: Install FFmpeg, Deno and Tesseract (the tool tests run the real programs)
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends ffmpeg
+          sudo apt-get install -y --no-install-recommends ffmpeg tesseract-ocr tesseract-ocr-eng tesseract-ocr-afr
           npm install -g "deno@${DENO_VERSION}"
+      - uses: actions/cache@v4
+        id: whisper-cache
+        with:
+          path: ~/whisper-bin
+          key: whisper-cli-${{ env.WHISPER_CPP_VERSION }}-${{ runner.os }}
+      - name: Build whisper-cli from the pinned whisper.cpp tag
+        if: steps.whisper-cache.outputs.cache-hit != 'true'
+        working-directory: ${{ runner.temp }}
+        run: |
+          git clone --depth 1 --branch "$WHISPER_CPP_VERSION" https://github.com/ggml-org/whisper.cpp
+          cmake -S whisper.cpp -B whisper.cpp/build -DCMAKE_BUILD_TYPE=Release -DBUILD_SHARED_LIBS=OFF -DGGML_NATIVE=OFF -DWHISPER_BUILD_TESTS=OFF
+          cmake --build whisper.cpp/build -j4 --target whisper-cli
+          mkdir -p ~/whisper-bin && cp whisper.cpp/build/bin/whisper-cli ~/whisper-bin/
+      - name: Speech models for the transcription test (tiny, pinned by SHA-256)
+        run: |
+          echo "$HOME/whisper-bin" >> "$GITHUB_PATH"
+          mkdir -p ~/whisper-models && cd ~/whisper-models
+          curl -fsSLo ggml-tiny-q5_1.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-tiny-q5_1.bin
+          curl -fsSLo ggml-silero-v6.2.0.bin https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin
+          printf '%s  %s\n' 818710568da3ca15689e31a743197b520007872ff9576237bda97bd1b469c3d7 ggml-tiny-q5_1.bin \
+            2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987 ggml-silero-v6.2.0.bin | sha256sum -c
+          echo "WERKBANK_TEST_WHISPER_MODEL=$HOME/whisper-models/ggml-tiny-q5_1.bin" >> "$GITHUB_ENV"
+          echo "WERKBANK_TEST_VAD_MODEL=$HOME/whisper-models/ggml-silero-v6.2.0.bin" >> "$GITHUB_ENV"
       - run: uv sync --frozen
       - run: uv run ruff check --config pyproject.toml . ../scripts/portable
       - run: uv run ruff format --check --config pyproject.toml . ../scripts/portable
@@ -107,17 +131,24 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: uv sync --project engine --frozen --group portable
+      - uses: actions/cache@v4
+        with:
+          path: build/portable-cache
+          key: portable-programs-${{ hashFiles('scripts/portable/programs.json') }}
       - name: Build Werkbank-windows-x64.zip (pinned programs, SHA-256 checked)
         run: uv run --project engine --frozen python scripts/portable/build.py
-      - name: Engine test suite on Windows with the bundled FFmpeg and Deno
+      - name: Engine test suite on Windows with the bundled FFmpeg, Deno, whisper.cpp and Tesseract
         shell: powershell
         working-directory: engine
         run: |
           $ErrorActionPreference = 'Continue'
-          $env:Path = "$env:GITHUB_WORKSPACE\build\portable\dist\Werkbank\bin;$env:Path"
+          $bin = "$env:GITHUB_WORKSPACE\build\portable\dist\Werkbank\bin"
+          $env:Path = "$bin;$bin\whisper;$bin\tesseract;$env:Path"
+          $env:WERKBANK_TEST_WHISPER_MODEL = "$bin\models\ggml-small-q5_1.bin"
+          $env:WERKBANK_TEST_VAD_MODEL = "$bin\models\ggml-silero-v6.2.0.bin"
           uv run --frozen pytest -q
           exit $LASTEXITCODE
-      - name: Smoke test the unpacked app (nothing else on PATH) and the yt-dlp self-update
+      - name: Smoke test the unpacked app (nothing else on PATH), incl. transcription, OCR and the yt-dlp self-update
         run: uv run --project engine --frozen python scripts/portable/smoke.py build/portable/dist/Werkbank --update-ytdlp
       - uses: actions/upload-artifact@v4
         with:

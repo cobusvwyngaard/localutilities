@@ -1,5 +1,5 @@
 {
-  "comment": "Programs bundled into the portable app (DESIGN.md 6.3). Pinned by version and SHA-256; build.py refuses anything else. yt-dlp updates itself after install (Status page).",
+  "comment": "Programs and models bundled into the portable app (DESIGN.md 6.3). Pinned by version and SHA-256; build.py refuses anything else. 'files' maps a path inside the download to a path in the app ('dir/*' copies a folder's files). yt-dlp updates itself after install (Status page).",
   "windows": [
     {
       "name": "FFmpeg (gyan.dev essentials build)",
@@ -19,7 +19,9 @@
       "version": "2.9.6",
       "url": "https://github.com/denoland/deno/releases/download/v2.9.6/deno-x86_64-pc-windows-msvc.zip",
       "sha256": "15e5300b0ba3c3695a7621d90160a746ec9e710228cee639afa9d580f6e3cd11",
-      "files": { "deno.exe": "bin/deno.exe" },
+      "files": {
+        "deno.exe": "bin/deno.exe"
+      },
       "licence": "MIT",
       "source": "https://github.com/denoland/deno/tree/v2.9.6"
     },
@@ -31,6 +33,123 @@
       "file": "bin/yt-dlp.exe",
       "licence": "Unlicense (the executable bundles components under other licences; run yt-dlp --version for details)",
       "source": "https://github.com/yt-dlp/yt-dlp/tree/2026.08.19"
+    },
+    {
+      "name": "whisper.cpp (CPU build)",
+      "version": "1.9.2",
+      "url": "https://github.com/ggml-org/whisper.cpp/releases/download/v1.9.2/whisper-bin-x64.zip",
+      "sha256": "49dcc16de826f20bd53d44f947a1ae49dfa81f86cad67a64d80820cb192d674a",
+      "files": {
+        "Release/whisper-cli.exe": "bin/whisper/whisper-cli.exe",
+        "Release/whisper.dll": "bin/whisper/whisper.dll",
+        "Release/ggml.dll": "bin/whisper/ggml.dll",
+        "Release/ggml-base.dll": "bin/whisper/ggml-base.dll",
+        "Release/ggml-cpu-alderlake.dll": "bin/whisper/ggml-cpu-alderlake.dll",
+        "Release/ggml-cpu-cannonlake.dll": "bin/whisper/ggml-cpu-cannonlake.dll",
+        "Release/ggml-cpu-cascadelake.dll": "bin/whisper/ggml-cpu-cascadelake.dll",
+        "Release/ggml-cpu-haswell.dll": "bin/whisper/ggml-cpu-haswell.dll",
+        "Release/ggml-cpu-icelake.dll": "bin/whisper/ggml-cpu-icelake.dll",
+        "Release/ggml-cpu-sandybridge.dll": "bin/whisper/ggml-cpu-sandybridge.dll",
+        "Release/ggml-cpu-skylakex.dll": "bin/whisper/ggml-cpu-skylakex.dll",
+        "Release/ggml-cpu-sse42.dll": "bin/whisper/ggml-cpu-sse42.dll",
+        "Release/ggml-cpu-x64.dll": "bin/whisper/ggml-cpu-x64.dll"
+      },
+      "licence": "MIT",
+      "source": "https://github.com/ggml-org/whisper.cpp/tree/v1.9.2"
+    },
+    {
+      "name": "Microsoft Visual C++ runtime (for whisper.cpp; from the msvc-runtime wheel)",
+      "version": "14.44.35112",
+      "url": "https://files.pythonhosted.org/packages/21/3b/134d04268ab8e35853cd007582076429b45d60d6abb1036d159be9c50342/msvc_runtime-14.44.35112-cp312-cp312-win_amd64.whl",
+      "sha256": "32f9c706009e16ccc319d6947ce3bffe20e5192bee52b18cf48313f9e7bedfbe",
+      "files": {
+        "msvc_runtime-14.44.35112.data/data/Scripts/msvcp140.dll": "bin/whisper/msvcp140.dll",
+        "msvc_runtime-14.44.35112.data/data/Scripts/vcruntime140.dll": "bin/whisper/vcruntime140.dll",
+        "msvc_runtime-14.44.35112.data/data/Scripts/vcruntime140_1.dll": "bin/whisper/vcruntime140_1.dll",
+        "msvc_runtime-14.44.35112.data/data/Scripts/vcomp140.dll": "bin/whisper/vcomp140.dll",
+        "msvc_runtime-14.44.35112.dist-info/licenses/LICENSE": "licences/Microsoft-VC-Runtime-REDIST.txt"
+      },
+      "licence": "Microsoft Visual Studio redistributable (REDIST list), unmodified",
+      "source": "https://learn.microsoft.com/en-us/cpp/windows/redistributing-visual-cpp-files"
+    },
+    {
+      "name": "Whisper model small (q5_1)",
+      "version": "ggerganov/whisper.cpp@5359861",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin",
+      "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "file": "bin/models/ggml-small-q5_1.bin",
+      "licence": "MIT (OpenAI Whisper weights)",
+      "source": "https://github.com/openai/whisper"
+    },
+    {
+      "name": "Whisper model large-v3-turbo (q5_0)",
+      "version": "ggerganov/whisper.cpp@5359861",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "file": "bin/models/ggml-large-v3-turbo-q5_0.bin",
+      "licence": "MIT (OpenAI Whisper weights)",
+      "source": "https://github.com/openai/whisper"
+    },
+    {
+      "name": "Silero VAD model (v6.2.0)",
+      "version": "ggml-org/whisper-vad@9ffd54a",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin",
+      "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+      "file": "bin/models/ggml-silero-v6.2.0.bin",
+      "licence": "MIT",
+      "source": "https://github.com/snakers4/silero-vad"
+    },
+    {
+      "name": "Tesseract OCR (UB Mannheim Windows build, unpacked; the installer is never run)",
+      "version": "5.4.0.20240606",
+      "url": "https://github.com/UB-Mannheim/tesseract/releases/download/v5.4.0.20240606/tesseract-ocr-w64-setup-5.4.0.20240606.exe",
+      "sha256": "c885fff6998e0608ba4bb8ab51436e1c6775c2bafc2559a19b423e18678b60c9",
+      "archive": "7z",
+      "files": {
+        "tesseract.exe": "bin/tesseract/tesseract.exe",
+        "libarchive-13.dll": "bin/tesseract/libarchive-13.dll",
+        "libb2-1.dll": "bin/tesseract/libb2-1.dll",
+        "libbz2-1.dll": "bin/tesseract/libbz2-1.dll",
+        "libcrypto-3-x64.dll": "bin/tesseract/libcrypto-3-x64.dll",
+        "libdeflate.dll": "bin/tesseract/libdeflate.dll",
+        "libexpat-1.dll": "bin/tesseract/libexpat-1.dll",
+        "libgcc_s_seh-1.dll": "bin/tesseract/libgcc_s_seh-1.dll",
+        "libgif-7.dll": "bin/tesseract/libgif-7.dll",
+        "libiconv-2.dll": "bin/tesseract/libiconv-2.dll",
+        "libjbig-0.dll": "bin/tesseract/libjbig-0.dll",
+        "libjpeg-8.dll": "bin/tesseract/libjpeg-8.dll",
+        "libleptonica-6.dll": "bin/tesseract/libleptonica-6.dll",
+        "libLerc.dll": "bin/tesseract/libLerc.dll",
+        "liblz4.dll": "bin/tesseract/liblz4.dll",
+        "liblzma-5.dll": "bin/tesseract/liblzma-5.dll",
+        "libopenjp2-7.dll": "bin/tesseract/libopenjp2-7.dll",
+        "libpng16-16.dll": "bin/tesseract/libpng16-16.dll",
+        "libsharpyuv-0.dll": "bin/tesseract/libsharpyuv-0.dll",
+        "libstdc++-6.dll": "bin/tesseract/libstdc++-6.dll",
+        "libtesseract-5.dll": "bin/tesseract/libtesseract-5.dll",
+        "libtiff-6.dll": "bin/tesseract/libtiff-6.dll",
+        "libwebp-7.dll": "bin/tesseract/libwebp-7.dll",
+        "libwebpmux-3.dll": "bin/tesseract/libwebpmux-3.dll",
+        "libwinpthread-1.dll": "bin/tesseract/libwinpthread-1.dll",
+        "libzstd.dll": "bin/tesseract/libzstd.dll",
+        "zlib1.dll": "bin/tesseract/zlib1.dll",
+        "tessdata/eng.traineddata": "bin/tesseract/tessdata/eng.traineddata",
+        "tessdata/osd.traineddata": "bin/tesseract/tessdata/osd.traineddata",
+        "tessdata/pdf.ttf": "bin/tesseract/tessdata/pdf.ttf",
+        "tessdata/configs/*": "bin/tesseract/tessdata/configs/",
+        "tessdata/tessconfigs/*": "bin/tesseract/tessdata/tessconfigs/"
+      },
+      "licence": "Apache-2.0 (Tesseract); bundled libraries under their own open-source licences",
+      "source": "https://github.com/tesseract-ocr/tesseract and https://github.com/UB-Mannheim/tesseract"
+    },
+    {
+      "name": "Tesseract Afrikaans language data (tessdata_best)",
+      "version": "tesseract-ocr/tessdata_best@e12c65a",
+      "url": "https://raw.githubusercontent.com/tesseract-ocr/tessdata_best/e12c65a915945e4c28e237a9b52bc4a8f39a0cec/afr.traineddata",
+      "sha256": "6f80b369205a51298a2113c662585d52dfc81bb9331c21845538cec959ebe09a",
+      "file": "bin/tesseract/tessdata/afr.traineddata",
+      "licence": "Apache-2.0",
+      "source": "https://github.com/tesseract-ocr/tessdata_best"
     }
   ],
   "linux-test": [
@@ -42,6 +161,33 @@
       "file": "bin/yt-dlp",
       "licence": "Unlicense",
       "source": "https://github.com/yt-dlp/yt-dlp/tree/2026.08.19"
+    },
+    {
+      "name": "Whisper model small (q5_1)",
+      "version": "ggerganov/whisper.cpp@5359861",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-small-q5_1.bin",
+      "sha256": "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
+      "file": "bin/models/ggml-small-q5_1.bin",
+      "licence": "MIT (OpenAI Whisper weights)",
+      "source": "https://github.com/openai/whisper"
+    },
+    {
+      "name": "Whisper model large-v3-turbo (q5_0)",
+      "version": "ggerganov/whisper.cpp@5359861",
+      "url": "https://huggingface.co/ggerganov/whisper.cpp/resolve/5359861c739e955e79d9a303bcbc70fb988958b1/ggml-large-v3-turbo-q5_0.bin",
+      "sha256": "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
+      "file": "bin/models/ggml-large-v3-turbo-q5_0.bin",
+      "licence": "MIT (OpenAI Whisper weights)",
+      "source": "https://github.com/openai/whisper"
+    },
+    {
+      "name": "Silero VAD model (v6.2.0)",
+      "version": "ggml-org/whisper-vad@9ffd54a",
+      "url": "https://huggingface.co/ggml-org/whisper-vad/resolve/9ffd54a1e1ee413ddf265af9913beaf518d1639b/ggml-silero-v6.2.0.bin",
+      "sha256": "2aa269b785eeb53a82983a20501ddf7c1d9c48e33ab63a41391ac6c9f7fb6987",
+      "file": "bin/models/ggml-silero-v6.2.0.bin",
+      "licence": "MIT",
+      "source": "https://github.com/snakers4/silero-vad"
     }
   ]
 }

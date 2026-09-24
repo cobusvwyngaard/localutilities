@@ -4,17 +4,20 @@ Local-first utilities suite: media download, compression and conversion, PDF too
 web interface. **Files are processed on your own machine and never uploaded.** See
 [`DESIGN.md`](DESIGN.md) (the source of truth) and [`CLAUDE.md`](CLAUDE.md) (conventions).
 
-Two ways to use the same UI:
+Everything runs in a **portable Windows app** (nothing to install); the hosted site at
+https://localutilities.cobus-w.workers.dev only shows the interface and the download link.
 
-| | Where the UI comes from | Where the work happens |
-|---|---|---|
-| **Mode A — local** (primary) | The engine on your laptop, `http://127.0.0.1:8765` | Native tools (FFmpeg, yt-dlp, pikepdf, …) |
-| **Mode B — hosted** | https://localutilities.cobus-w.workers.dev | Inside the browser only |
+What it does (DESIGN.md §4.0):
 
-Status: **Phase 1** — on the engine (Mode A): download video/audio (yt-dlp), compress video and audio,
-convert video and audio (without re-encoding when possible) and unlock PDFs, with live progress, cancel,
-drag-and-drop, the Inbox/Outbox folders and a jobs list. The hosted site (Mode B) shows the tools but
-they need the engine until the browser versions arrive in Phase 2 (DESIGN.md §9).
+- **Media:** download video/audio (yt-dlp), compress and convert video and audio (without
+  re-encoding when possible).
+- **Transcription:** speech in audio or video to TXT, SRT and VTT with Whisper (a fast model and an
+  accurate one; English, Afrikaans and more).
+- **PDF:** merge, split, select/reorder/delete pages, rotate, crop, pages per sheet and booklets,
+  page numbers, watermarks, compress, protect (AES-256), unlock, remove metadata, redact, sign
+  digitally, flatten forms, repair, OCR (English/Afrikaans), to images, from images, to text, tables
+  to Excel/CSV, extract images and attachments, compare two PDFs, information report.
+- Live progress, cancel, drag-and-drop, the Inbox/Outbox folders and a jobs list.
 
 ## Use it on Windows (Mode A) — nothing to install
 
@@ -25,7 +28,8 @@ they need the engine until the browser versions arrive in Phase 2 (DESIGN.md §9
    `http://127.0.0.1:8765`. Close that window to stop Werkbank.
 
 No administrator rights, no installer, no PATH changes: the app contains its own Python, FFmpeg,
-FFprobe, Deno and yt-dlp (versions and SHA-256 pinned in
+FFprobe, Deno, yt-dlp, whisper.cpp with two speech models, and Tesseract OCR (about 1 GB unpacked;
+versions and SHA-256 pinned in
 [`scripts/portable/programs.json`](scripts/portable/programs.json)). Windows SmartScreen may warn the
 first time because the app is not code-signed: **More info → Run anyway** (no admin needed).
 
