@@ -334,6 +334,40 @@ export const tools: readonly ToolDef[] = [
     requires: ['whisper', 'ffmpeg', 'ffprobe'],
   },
   {
+    id: 'image.qr',
+    title: 'QR code from a web address',
+    description: 'Make a QR code that opens a web page when scanned. The address is only encoded, never visited.',
+    category: 'image',
+    runsIn: ['engine'],
+    inputs: { kinds: ['url'], min: 1, max: 1 },
+    params: {
+      format: {
+        type: 'enum',
+        label: 'Save as',
+        options: [
+          { value: 'png', label: 'PNG image (screens, documents)' },
+          { value: 'svg', label: 'SVG (vector: websites, design programs)' },
+          { value: 'pdf', label: 'PDF (vector: printing)' },
+          { value: 'all', label: 'PNG, SVG and PDF' },
+        ],
+        default: 'png',
+      },
+      size: { type: 'number', label: 'PNG size', min: 100, max: 4000, default: 1000, integer: true, unit: 'px' },
+      errorCorrection: {
+        type: 'enum',
+        label: 'Error correction',
+        options: [
+          { value: 'l', label: 'Low (7 %): simplest code' },
+          { value: 'm', label: 'Medium (15 %): recommended' },
+          { value: 'q', label: 'Quartile (25 %)' },
+          { value: 'h', label: 'High (30 %): survives damage or a logo on top' },
+        ],
+        default: 'm',
+      },
+    },
+    requires: [],
+  },
+  {
     id: 'pdf.merge',
     title: 'Merge PDFs',
     description: 'Combine PDFs into one, in the order you added them.',

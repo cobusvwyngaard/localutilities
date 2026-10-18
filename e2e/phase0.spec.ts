@@ -78,7 +78,7 @@ test.describe('Mode B: hosted static build (Cloudflare config)', () => {
     await page.getByRole('navigation', { name: 'Categories' }).getByRole('link', { name: /^PDF/ }).click();
     await expect(page.getByRole('heading', { name: 'PDF', exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: /Unlock PDF/ })).toContainText('Needs the engine on your laptop');
-    await page.getByRole('navigation', { name: 'Categories' }).getByRole('link', { name: /^Images/ }).click();
+    await page.getByRole('navigation', { name: 'Categories' }).getByRole('link', { name: /^Documents/ }).click();
     await expect(page.getByText('No tools here yet.')).toBeVisible();
 
     await page.waitForTimeout(500);

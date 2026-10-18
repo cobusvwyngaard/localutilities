@@ -17,6 +17,7 @@ What it does (DESIGN.md §4.0):
   page numbers, watermarks, compress, protect (AES-256), unlock, remove metadata, redact, sign
   digitally, flatten forms, repair, OCR (English/Afrikaans), to images, from images, to text, tables
   to Excel/CSV, extract images and attachments, compare two PDFs, information report.
+- **QR codes:** from a web address, as PNG, SVG or PDF.
 - Live progress, cancel, drag-and-drop, the Inbox/Outbox folders and a jobs list.
 
 ## Use it on Windows (Mode A) — nothing to install

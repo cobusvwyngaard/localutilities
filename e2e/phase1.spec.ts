@@ -105,3 +105,14 @@ test('PDF merge: several files in the order added, one result', async ({ page })
   await expect(job).toContainText('Merged 2 files into one PDF of 3 pages.');
   await expect(job).toContainText('two (merged).pdf');
 });
+
+test('QR code: from a web address to a PNG', async ({ page }) => {
+  await openTool(page, 'image.qr');
+  await page.getByLabel('Web address', { exact: true }).fill('https://example.com/docs');
+  await page.getByRole('button', { name: 'Start' }).click();
+  const job = latestJob(page);
+  await expect(job).toHaveAttribute('data-status', 'done');
+  await expect(job).toContainText('QR example.com-docs.png');
+  const [download] = await Promise.all([page.waitForEvent('download'), job.getByRole('button', { name: 'Download' }).click()]);
+  expect(download.suggestedFilename()).toBe('QR example.com-docs.png');
+});

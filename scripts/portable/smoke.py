@@ -80,13 +80,16 @@ class Engine:
             time.sleep(0.5)
         raise AssertionError("Werkbank did not serve its UI in time")
 
-    def output_text(self, job: dict, index: int) -> str:
+    def output_bytes(self, job: dict, index: int) -> bytes:
         req = urllib.request.Request(  # noqa: S310 - http://127.0.0.1
             f"{self.base}/api/jobs/{job['id']}/outputs/{index}",
             headers={"Authorization": f"Bearer {self.token}"},
         )
         with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 - http://127.0.0.1
-            return resp.read().decode("utf-8", errors="replace")
+            return resp.read()
+
+    def output_text(self, job: dict, index: int) -> str:
+        return self.output_bytes(job, index).decode("utf-8", errors="replace")
 
     def upload(self, path: Path) -> str:
         name = urllib.parse.quote(path.name)
@@ -130,6 +133,15 @@ def make_restricted_pdf(folder: Path) -> Path:
         ),
     )
     return path
+
+
+def decode_qr(png: bytes) -> list[str]:
+    import io
+
+    import zxingcpp
+    from PIL import Image
+
+    return [result.text for result in zxingcpp.read_barcodes(Image.open(io.BytesIO(png)))]
 
 
 def make_sample_pdf(folder: Path) -> Path:
@@ -302,6 +314,9 @@ def main() -> None:
         )
         ocr = engine.job("pdf.ocr", [{"fileId": engine.upload(make_scan(sample, media))}])
         assert "recognised text on 1 page" in ocr["notes"][0], ocr["notes"]
+
+        qr = engine.job("image.qr", [{"url": "https://example.com/werkbank"}])
+        assert decode_qr(engine.output_bytes(qr, 0)) == ["https://example.com/werkbank"]
 
         if args.update_ytdlp:
             result = engine.request("POST", "/api/admin/update-ytdlp")

@@ -113,6 +113,7 @@ Phase numbers refer to §9. **E** = engine (native), **B** = browser (dropped in
 | PDF conversion | `pdf.to-images`, `pdf.from-images` (JPEG kept as is), `pdf.to-text`, `pdf.tables` (XLSX or CSV) | PDFium (pypdfium2), img2pdf, pdfplumber, openpyxl |
 | PDF security | `pdf.unlock`, `pdf.protect` (AES-256, permissions), `pdf.clean-metadata`, `pdf.redact` (true redaction, verified), `pdf.sign` (PAdES with the user's .p12/.pfx; offline) | pikepdf, PDFium, pyHanko |
 | PDF analysis | `pdf.ocr` (eng, afr, eng+afr), `pdf.info`, `pdf.extract` (images, attachments), `pdf.compare` (HTML text diff) | Tesseract 5.4 (text-only PDF layer over the untouched page), pikepdf, difflib |
+| Images | `image.qr`: QR code from a web address as PNG (size in px), SVG and/or PDF (vector); error correction L/M/Q/H | segno (pure Python); the address is encoded, never visited |
 
 Not built, and why: **PDF → Word** (the usable libraries are AGPL, e.g. PyMuPDF), **Office/HTML → PDF** (needs LibreOffice, several hundred MB), **PDF/A validation** (veraPDF needs Java), **filling PDF forms** (needs a field-by-field form UI; flattening is built), **greyscale conversion** (needs Ghostscript).
 
@@ -161,7 +162,7 @@ Not built, and why: **PDF → Word** (the usable libraries are AGPL, e.g. PyMuPD
 | Tool | Notes | E | B | Phase |
 |---|---|---|---|---|
 | Image convert / resize / compress | Incl. HEIC → JPG; libvips via `pyvips` (E), Canvas/WASM codecs (B) | ✅ | ✅ | 2 |
-| QR code generator | Pure browser; SVG + PNG output | — | ✅ | 2 |
+| QR code generator | **Built (v0.4.1)** in the engine as `image.qr` (browser path dropped in v0.3): PNG, SVG and PDF; tests decode every code again with zxing-cpp | ✅ | — | 2 |
 | Background removal | `rembg` (downloads a model on first use) | ✅ | ❌ | 4 |
 | Checksums (SHA-256), zip/unzip | | ✅ | ✅ | 4 |
 | Batch rename | Pattern-based, preview before apply | ✅ | ❌ | 4 |
@@ -384,7 +385,7 @@ werkbank/
 - *Status (23 Sept 2026): built. Verified in CI through the real UI and engine: live progress over SSE and a clean cancel (40-second clip, not 1 h), remux-first conversion, target-size compression within the target, PDF unlock of both kinds (the password is never echoed back), and yt-dlp downloading from a web server; the engine test suite also runs on Windows. **Not yet verified: YouTube** — YouTube refuses cloud/CI addresses ("Sign in to confirm you're not a bot"), so the MP4/M4A download must be confirmed on the owner's laptop.*
 
 **Phase 2 — First additions (in the portable app)**
-- *Status (24 Sept 2026): the full PDF set and transcription (brought forward from Phase 3) are built — §4.0. Verified by engine tests on Linux and Windows (real pikepdf, PDFium, Tesseract, whisper.cpp, pyHanko) and by the smoke test of the frozen app (transcription with both models, OCR, signing, tables, redaction, …). Still to do: image tools, QR codes, trim/extract audio, loudness normalisation.*
+- *Status (24 Sept 2026): the full PDF set and transcription (brought forward from Phase 3) are built — §4.0. Verified by engine tests on Linux and Windows (real pikepdf, PDFium, Tesseract, whisper.cpp, pyHanko) and by the smoke test of the frozen app (transcription with both models, OCR, signing, tables, redaction, …). QR codes added 18 Oct 2026. Still to do: image tools, trim/extract audio, loudness normalisation.*
 - PDF page tools, image tools, QR codes, metadata stripping, loudness normalisation, trim/extract audio; PDF compression only if a Ghostscript (AGPL) or alternative can run from `bin/` without installation.
 - ~~Browser path (Mediabunny, qpdf-wasm) and Mode B → engine connection~~ — dropped in v0.3 (processing in the portable app only).
 - ✅ Accept when: each new tool works in the portable app on a clean Windows machine with nothing installed.
